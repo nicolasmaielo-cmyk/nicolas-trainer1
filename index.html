@@ -1584,7 +1584,7 @@
             <i class="fas fa-stopwatch" style="color:var(--text-muted); font-size:0.8rem;"></i>
             <span class="timer-display" id="headerTimerDisplay">00:00</span>
         </div>
-        <div class="header-badge">v7.5</div>
+        <div class="header-badge">v7.6</div>
         <div class="header-badge cloud-status-badge" id="cloud-status-badge"><i class="fas fa-hard-drive"></i> Local</div>
     </div>
 </header>
@@ -4949,8 +4949,9 @@ function buildStudentAppLink(plan) {
         mediaLib: getRelevantMediaForPlan(plan.treinos),
         profile: STATE.profile
     });
-    const base = `${location.origin}${location.pathname}`;
-    return `${base}?app=aluno&code=${encodeURIComponent(plan.code)}#plan=${encodeURIComponent(payload)}`;
+    const dir = location.pathname.replace(/[^/]*$/, '');
+    const base = `${location.origin}${dir}aluno.html`;
+    return `${base}?code=${encodeURIComponent(plan.code)}#plan=${encodeURIComponent(payload)}`;
 }
 
 function daysSince(dateIso) {

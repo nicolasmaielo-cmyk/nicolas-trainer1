@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Nicolas Trainer | Área do Aluno</title>
+<meta name="theme-color" content="#080810">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./app-icon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    :root {
+        --primary: #6c63ff;
+        --primary-dim: rgba(108,99,255,0.14);
+        --accent: #00d4aa;
+        --bg-main: #0a0a12;
+        --bg-card: #12121e;
+        --bg-input: #181826;
+        --border: #24243a;
+        --text-main: #eef0f8;
+        --text-muted: #9a9ab0;
+        --text-dim: #5c5c74;
+        --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 0%, #14142a 0%, #08080f 65%);
+        font-family: 'Inter', sans-serif;
+        color: var(--text-main);
+        padding: 20px;
+    }
+    .card {
+        width: 100%;
+        max-width: 380px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 32px 26px;
+        text-align: center;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .brand {
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 700;
+        font-size: 1.6rem;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        background: linear-gradient(90deg, var(--primary), var(--accent));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 4px;
+    }
+    .subtitle { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 26px; }
+    input {
+        width: 100%;
+        background: var(--bg-input);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+        color: var(--text-main);
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 700;
+        font-size: 1.3rem;
+        text-align: center;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin-bottom: 14px;
+    }
+    input::placeholder { color: var(--text-dim); letter-spacing: 1px; text-transform: none; font-size: 0.85rem; }
+    input:focus { outline: none; border-color: var(--primary); }
+    button {
+        width: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--accent));
+        border: none;
+        border-radius: 10px;
+        padding: 14px;
+        color: #05050a;
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        cursor: pointer;
+    }
+    button:active { transform: scale(0.98); }
+    .hint { margin-top: 18px; color: var(--text-dim); font-size: 0.76rem; line-height: 1.5; }
+    .loading { color: var(--text-muted); font-size: 0.9rem; }
+    .spinner {
+        width: 34px; height: 34px;
+        border: 3px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        margin: 0 auto 16px;
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #error-msg { color: #ff6b6b; font-size: 0.8rem; margin-top: -6px; margin-bottom: 12px; display: none; }
+</style>
+</head>
+<body>
+
+<div class="card">
+    <div class="brand">Nicolas Trainer</div>
+    <div class="subtitle" id="subtitle">Área do Aluno — acompanhe seu treino</div>
+
+    <div id="loading-view" style="display:none;">
+        <div class="spinner"></div>
+        <div class="loading">Carregando sua ficha...</div>
+    </div>
+
+    <form id="aluno-form">
+        <input id="aluno-code" type="text" placeholder="Digite seu código de acesso" maxlength="12" autocomplete="off" autocapitalize="characters">
+        <div id="error-msg">Código não encontrado. Confira com seu professor.</div>
+        <button type="submit"><i class="fas fa-arrow-right-to-bracket"></i> Entrar</button>
+    </form>
+
+    <div class="hint">Não tem um código? Fale com o seu personal trainer para receber o acesso à sua ficha.</div>
+</div>
+
+<script>
+(function() {
+    const params = new URLSearchParams(location.search);
+    const hash = location.hash; // pode conter a ficha embutida (#plan=...)
+    const codeFromUrl = params.get('code');
+
+    function goToApp(code) {
+        document.getElementById('aluno-form').style.display = 'none';
+        document.getElementById('subtitle').style.display = 'none';
+        document.getElementById('loading-view').style.display = 'block';
+        const target = new URL('./index.html', location.href);
+        target.searchParams.set('app', 'aluno');
+        if(code) target.searchParams.set('code', code.trim().toUpperCase());
+        if(hash) target.hash = hash.replace(/^#/, '');
+        location.replace(target.toString());
+    }
+
+    if(codeFromUrl) {
+        goToApp(codeFromUrl);
+        return;
+    }
+
+    document.getElementById('aluno-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const val = document.getElementById('aluno-code').value.trim();
+        if(!val) return;
+        goToApp(val);
+    });
+
+    if('serviceWorker' in navigator && location.protocol !== 'file:') {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+})();
+</script>
+
+</body>
+</html>
