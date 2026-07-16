@@ -1,0 +1,20 @@
+{
+  "name": "Nicolas Trainer",
+  "short_name": "Trainer",
+  "description": "App de fichas, acompanhamento e presenca para personal trainer.",
+  "start_url": "index%20(7).html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080810",
+  "theme_color": "#080810",
+  "categories": ["fitness", "health", "productivity"],
+  "icons": [
+    {
+      "src": "app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
