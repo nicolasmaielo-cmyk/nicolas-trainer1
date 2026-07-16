@@ -5748,7 +5748,7 @@ function importStudentPlanFromUrl() {
             }
         }
         const code = params.get('code');
-        if(code && findStudentPlanByCode(code)) STATE.studentApp.activeCode = String(code).toUpperCase();
+        if(code) STATE.studentApp.activeCode = String(code).toUpperCase();
         if(params.get('app') === 'aluno') {
             setTimeout(async () => {
                 const btn = document.querySelector('nav button[onclick*="tab-app"]');
