@@ -9,8 +9,9 @@
     <meta name="apple-mobile-web-app-title" content="Nicolas Trainer">
     <meta name="description" content="Plataforma profissional de gestão de treinos">
     <title>NICOLAS TRAINER | Gestão Profissional de Treinos</title>
-    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="manifest" id="nt-manifest-link" href="manifest.webmanifest">
     <link rel="icon" href="app-icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <script type="text/javascript" src="./exercise-media-catalog.js?v=7.1"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -6164,6 +6165,10 @@ function importStudentPlanFromUrl() {
         if(code) STATE.studentApp.activeCode = String(code).toUpperCase();
         if(params.get('app') === 'aluno') {
             setTimeout(async () => {
+                // Ícone instalado sem código na URL (reabertura pelo atalho) — recupera o último código salvo neste aparelho
+                if(!STATE.studentApp.activeCode) await restoreStudentAppStateIfNeeded();
+                if(STATE.studentApp.activeCode) persistStudentAppState();
+                setupStudentInstallExperience(STATE.studentApp.activeCode);
                 const btn = document.querySelector('nav button[onclick*="tab-app"]');
                 showTab('tab-app', btn);
                 const activeCode = STATE.studentApp.activeCode;
@@ -6181,6 +6186,90 @@ function importStudentPlanFromUrl() {
     } catch(e) {
         console.error('[NT] importStudentPlanFromUrl error:', e);
     }
+}
+
+/* ================================================================
+   PERSISTÊNCIA DO CÓDIGO DO ALUNO + INSTALAÇÃO (Android/iOS)
+   ================================================================ */
+function persistStudentAppState() {
+    try { saveToDB('studentAppState', { activeCode: STATE.studentApp.activeCode || '' }); } catch(e) {}
+}
+
+function restoreStudentAppStateIfNeeded() {
+    return new Promise(resolve => {
+        if(STATE.studentApp.activeCode) { resolve(); return; }
+        try {
+            getFromDB('studentAppState', v => {
+                if(v && v.activeCode) STATE.studentApp.activeCode = v.activeCode;
+                resolve();
+            });
+        } catch(e) { resolve(); }
+    });
+}
+
+// Reescreve o manifest dinamicamente com o código do aluno embutido no start_url,
+// pra que "Adicionar à Tela de Início" (Android e iOS) abra direto na ficha dele,
+// e não na tela do professor.
+function setupStudentInstallExperience(code) {
+    try {
+        if(code) {
+            fetch('./manifest.webmanifest').then(r => r.json()).then(manifest => {
+                const personalizedUrl = `./index.html?app=aluno&code=${encodeURIComponent(code)}`;
+                manifest.start_url = personalizedUrl;
+                manifest.id = personalizedUrl;
+                manifest.short_name = 'Meu Treino';
+                const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+                const link = document.getElementById('nt-manifest-link');
+                if(link) link.href = URL.createObjectURL(blob);
+            }).catch(e => console.warn('[NT] manifest dinâmico falhou:', e));
+        }
+        renderInstallBanner();
+    } catch(e) { console.error('[NT] setupStudentInstallExperience error:', e); }
+}
+
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    renderInstallBanner();
+});
+window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    document.getElementById('nt-install-banner')?.remove();
+});
+
+function isRunningStandalone() {
+    return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+}
+
+function isIOSDevice() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function renderInstallBanner() {
+    if(!document.body.classList.contains('student-standalone')) return;
+    if(isRunningStandalone()) return;
+    if(document.getElementById('nt-install-banner')) return;
+    const isIOS = isIOSDevice();
+    if(!isIOS && !deferredInstallPrompt) return;
+    const el = document.createElement('div');
+    el.id = 'nt-install-banner';
+    el.style.cssText = 'position:sticky;top:0;z-index:500;display:flex;align-items:center;gap:10px;padding:10px 14px;margin:0 0 12px;border-radius:10px;background:linear-gradient(90deg,var(--primary,#6c63ff),var(--accent,#00d4aa));color:#05050a;font-family:Inter,sans-serif;font-weight:600;font-size:0.82rem;';
+    if(isIOS) {
+        el.innerHTML = '<i class="fas fa-arrow-up-from-bracket"></i> <span>Toque em <b>Compartilhar</b> e depois em <b>"Adicionar à Tela de Início"</b> pra instalar seu treino.</span> <button id="nt-install-dismiss" style="margin-left:auto;background:none;border:none;font-size:1rem;cursor:pointer;color:#05050a;">&times;</button>';
+    } else {
+        el.innerHTML = '<i class="fas fa-download"></i> <span>Instale o app pra acessar seu treino offline.</span> <button id="nt-install-btn" style="margin-left:auto;background:#05050a;color:#eef0f8;border:none;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;">Instalar</button>';
+    }
+    const container = document.getElementById('tab-app');
+    if(container) container.prepend(el);
+    document.getElementById('nt-install-dismiss')?.addEventListener('click', () => el.remove());
+    document.getElementById('nt-install-btn')?.addEventListener('click', async () => {
+        if(!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        el.remove();
+    });
 }
 
 function registerNicolasTrainerSW() {

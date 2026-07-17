@@ -1,10 +1,14 @@
 
-const CACHE_NAME = 'nicolas-trainer-v7-9';
+const CACHE_NAME = 'nicolas-trainer-v7-10';
 const LOCAL_ASSETS = [
   './',
   './index.html',
+  './aluno.html',
   './manifest.webmanifest',
   './app-icon.svg',
+  './apple-touch-icon.png',
+  './icon-192.png',
+  './icon-512.png',
   './exercise-media-catalog.js'
 ];
 
