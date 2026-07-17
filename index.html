@@ -6164,11 +6164,17 @@ function importStudentPlanFromUrl() {
         const code = params.get('code');
         if(code) STATE.studentApp.activeCode = String(code).toUpperCase();
         if(params.get('app') === 'aluno') {
+            // Roda IMEDIATAMENTE (sem esperar setTimeout/fetch) — precisa estar pronto
+            // antes do aluno tocar em "Adicionar à Tela de Início".
+            if(STATE.studentApp.activeCode) setupStudentInstallExperience(STATE.studentApp.activeCode);
             setTimeout(async () => {
                 // Ícone instalado sem código na URL (reabertura pelo atalho) — recupera o último código salvo neste aparelho
-                if(!STATE.studentApp.activeCode) await restoreStudentAppStateIfNeeded();
+                if(!STATE.studentApp.activeCode) {
+                    await restoreStudentAppStateIfNeeded();
+                    if(STATE.studentApp.activeCode) setupStudentInstallExperience(STATE.studentApp.activeCode);
+                }
                 if(STATE.studentApp.activeCode) persistStudentAppState();
-                setupStudentInstallExperience(STATE.studentApp.activeCode);
+                renderInstallBanner();
                 const btn = document.querySelector('nav button[onclick*="tab-app"]');
                 showTab('tab-app', btn);
                 const activeCode = STATE.studentApp.activeCode;
@@ -6207,21 +6213,39 @@ function restoreStudentAppStateIfNeeded() {
     });
 }
 
-// Reescreve o manifest dinamicamente com o código do aluno embutido no start_url,
-// pra que "Adicionar à Tela de Início" (Android e iOS) abra direto na ficha dele,
-// e não na tela do professor.
+// Reescreve o manifest com o código do aluno embutido no start_url, pra que
+// "Adicionar à Tela de Início" (Android e iOS) abra direto na ficha dele.
+// Usa data: URI (conteúdo embutido na própria URL) em vez de blob: — blob:
+// depende do registro de blobs da aba, que o processo nativo de instalação
+// do iOS pode não conseguir resolver. data: é autocontida, sem essa dependência.
+// Roda de forma síncrona (sem fetch/await) pra estar pronta o quanto antes.
 function setupStudentInstallExperience(code) {
     try {
         if(code) {
-            fetch('./manifest.webmanifest').then(r => r.json()).then(manifest => {
-                const personalizedUrl = `./index.html?app=aluno&code=${encodeURIComponent(code)}`;
-                manifest.start_url = personalizedUrl;
-                manifest.id = personalizedUrl;
-                manifest.short_name = 'Meu Treino';
-                const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-                const link = document.getElementById('nt-manifest-link');
-                if(link) link.href = URL.createObjectURL(blob);
-            }).catch(e => console.warn('[NT] manifest dinâmico falhou:', e));
+            const base = location.href;
+            const personalizedUrl = new URL(`./index.html?app=aluno&code=${encodeURIComponent(code)}`, base).href;
+            const scopeUrl = new URL('./', base).href;
+            const manifest = {
+                name: 'Nicolas Trainer — Meu Treino',
+                short_name: 'Meu Treino',
+                description: 'Sua ficha de treino, cargas e frequência.',
+                id: personalizedUrl,
+                start_url: personalizedUrl,
+                scope: scopeUrl,
+                display: 'standalone',
+                orientation: 'portrait',
+                background_color: '#080810',
+                theme_color: '#080810',
+                icons: [
+                    { src: new URL('app-icon.svg', base).href, sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+                    { src: new URL('icon-192.png', base).href, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+                    { src: new URL('icon-512.png', base).href, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+                ]
+            };
+            const json = JSON.stringify(manifest);
+            const dataUri = 'data:application/manifest+json;base64,' + btoa(unescape(encodeURIComponent(json)));
+            const link = document.getElementById('nt-manifest-link');
+            if(link) link.href = dataUri;
         }
         renderInstallBanner();
     } catch(e) { console.error('[NT] setupStudentInstallExperience error:', e); }
