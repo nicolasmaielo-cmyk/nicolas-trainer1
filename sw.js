@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'nicolas-trainer-v7-5';
+const CACHE_NAME = 'nicolas-trainer-v7-6';
 const LOCAL_ASSETS = [
   './',
   './index.html',
