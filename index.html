@@ -1994,7 +1994,7 @@
 <div id="tab-app" class="container">
     <div class="card trainer-only">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
-            <h2 class="section-title" style="margin:0; border:none; padding:0;"><i class="fas fa-gauge-high"></i> Painel do Personal</h2>
+            <h2 class="section-title" style="margin:0; border:none; padding:0;"><i class="fas fa-gauge-high"></i> Painel do Personal <small style="font-weight:500; font-size:0.62rem; color:var(--text-dim); text-transform:none; letter-spacing:0;">build v7-9</small></h2>
             <button class="btn btn-ghost btn-small" onclick="renderStudentAppAll()"><i class="fas fa-rotate"></i> Atualizar</button>
         </div>
         <div id="trainer-dashboard" class="trainer-dashboard"></div>
@@ -5320,7 +5320,7 @@ function renderProfessorAppPanel() {
             ? `<div class="load-section-title"><i class="fas fa-dumbbell"></i> Progressão por Exercício</div>
                ${renderLoadProgressionList(plan, buildStudentLoadSeries, 'Ainda não há cargas registradas pelo aluno.')}
                <div class="load-section-title" style="margin-top:16px;"><i class="fas fa-layer-group"></i> Progressão por Grupo Muscular</div>
-               ${renderLoadProgressionList(plan, buildStudentGroupLoadSeries, 'Ainda não há cargas registradas por grupo muscular.')}
+               ${renderLoadProgressionList(plan, buildStudentGroupLoadSeries, 'Ainda não há cargas registradas por grupo muscular.', 'bar')}
                <div class="load-section-title" style="margin-top:16px;"><i class="fas fa-star"></i> Histórico de Recordes</div>
                ${renderRecordHistoryList(plan)}`
             : '<div class="empty-state" style="padding:18px;"><i class="fas fa-chart-line"></i><p>Libere a ficha no app para acompanhar a progressão de carga.</p></div>';
@@ -5673,9 +5673,9 @@ function finishStudentWorkout() {
     saveToDB('studentSessions', STATE.studentSessions);
     cloudSaveSession(session);
     showToast('Treino concluído.', 'success');
+    if(records.length) showRecordCelebration(records);
     renderStudentDashboard();
     renderAttendancePanel();
-    if(records.length) showRecordCelebration(records);
 }
 
 /* ===================== PROGRESSÃO DE CARGA & FREQUÊNCIA ===================== */
@@ -5747,6 +5747,28 @@ function renderLoadSparklineSVG(points) {
     </svg>`;
 }
 
+/* Gráfico de barras (usado na progressão por grupo muscular) */
+function renderLoadBarChartSVG(points) {
+    const w = 260, h = 70, pad = 6, bottomPad = 14;
+    if(!points.length) return '';
+    const loads = points.map(p => p.load);
+    const max = Math.max(...loads) || 1;
+    const plotH = h - pad - bottomPad;
+    const stepX = (w - pad * 2) / points.length;
+    const barW = Math.max(6, stepX * 0.55);
+    const bars = points.map((p, i) => {
+        const barH = Math.max(2, (p.load / max) * plotH);
+        const x = pad + i * stepX + (stepX - barW) / 2;
+        const y = h - bottomPad - barH;
+        const isLast = i === points.length - 1;
+        return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="2" fill="${isLast ? '#00d4aa' : '#6c63ff'}" opacity="${isLast ? '1' : '0.8'}"></rect>`;
+    }).join('');
+    return `<svg viewBox="0 0 ${w} ${h}" class="load-spark-svg" preserveAspectRatio="none">
+        <line x1="${pad}" y1="${(h - bottomPad).toFixed(1)}" x2="${(w - pad).toFixed(1)}" y2="${(h - bottomPad).toFixed(1)}" stroke="#24243a" stroke-width="1"></line>
+        ${bars}
+    </svg>`;
+}
+
 function buildStudentRecordHistory(plan) {
     if(!plan) return [];
     const sessions = STATE.studentSessions
@@ -5780,7 +5802,7 @@ function renderRecordHistoryList(plan) {
     }).join('')}</div>`;
 }
 
-function renderLoadProgressionList(plan, seriesFn = buildStudentLoadSeries, emptyMsg = 'Ainda não há cargas registradas pelo aluno.') {
+function renderLoadProgressionList(plan, seriesFn = buildStudentLoadSeries, emptyMsg = 'Ainda não há cargas registradas pelo aluno.', chartType = 'line') {
     const series = seriesFn(plan);
     const names = Object.keys(series);
     if(!names.length) {
@@ -5802,7 +5824,7 @@ function renderLoadProgressionList(plan, seriesFn = buildStudentLoadSeries, empt
                 <strong>${escapeHtml(name)}</strong>
                 <span class="load-trend ${trendClass}"><i class="fas ${trendIcon}"></i> ${trendText}</span>
             </div>
-            ${renderLoadSparklineSVG(points)}
+            ${chartType === 'bar' ? renderLoadBarChartSVG(points) : renderLoadSparklineSVG(points)}
             <div class="load-card-foot">
                 <span>${points.length} registro(s)</span>
                 <span>Última: ${formatVolume(last)}kg em ${lastDate}</span>
@@ -5972,7 +5994,7 @@ function renderStudentDashboard() {
             <div class="load-section-title"><i class="fas fa-dumbbell"></i> Progressão por Exercício</div>
             ${renderLoadProgressionList(plan, buildStudentLoadSeries, 'Ainda não há cargas registradas pelo aluno.')}
             <div class="load-section-title" style="margin-top:16px;"><i class="fas fa-layer-group"></i> Progressão por Grupo Muscular</div>
-            ${renderLoadProgressionList(plan, buildStudentGroupLoadSeries, 'Ainda não há cargas registradas por grupo muscular.')}
+            ${renderLoadProgressionList(plan, buildStudentGroupLoadSeries, 'Ainda não há cargas registradas por grupo muscular.', 'bar')}
             <div class="load-section-title" style="margin-top:16px;"><i class="fas fa-star"></i> Histórico de Recordes</div>
             ${renderRecordHistoryList(plan)}
         `;
