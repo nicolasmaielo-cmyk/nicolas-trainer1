@@ -2962,6 +2962,10 @@ async function initCloudSync() {
             await loadScriptOnce('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js');
             if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
             fbDb = firebase.firestore();
+            // Navegadores embutidos (WhatsApp/Instagram/Facebook no iPhone) costumam bloquear
+            // a conexão streaming (WebChannel) que o Firestore usa por padrão, fazendo leituras/
+            // escritas travarem em silêncio. Forçar long-polling evita esse problema.
+            try { fbDb.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch(e) {}
             fbEnabled = true;
             updateCloudStatusBadge();
             console.info('[NT] Sincronização em nuvem ativa.');
@@ -6163,26 +6167,52 @@ function importStudentPlanFromUrl() {
         }
         const code = params.get('code');
         if(code) STATE.studentApp.activeCode = String(code).toUpperCase();
-        if(params.get('app') === 'aluno') {
-            // Roda IMEDIATAMENTE (sem esperar setTimeout/fetch) — precisa estar pronto
-            // antes do aluno tocar em "Adicionar à Tela de Início".
-            if(STATE.studentApp.activeCode) setupStudentInstallExperience(STATE.studentApp.activeCode);
+
+        // Ícone instalado no iOS pode abrir sem NENHUM parâmetro na URL (o manifest
+        // personalizado pode não ter sido respeitado pelo sistema). Se o app está
+        // rodando em modo instalado (standalone) e não tem 'app=aluno' na URL, mas
+        // este aparelho já foi usado como app de aluno antes, tratamos como aluno
+        // mesmo assim — em vez de mostrar a tela cheia do professor.
+        if(params.get('app') === 'aluno' || isRunningStandalone()) {
             setTimeout(async () => {
                 // Ícone instalado sem código na URL (reabertura pelo atalho) — recupera o último código salvo neste aparelho
-                if(!STATE.studentApp.activeCode) {
-                    await restoreStudentAppStateIfNeeded();
-                    if(STATE.studentApp.activeCode) setupStudentInstallExperience(STATE.studentApp.activeCode);
+                if(!STATE.studentApp.activeCode) await restoreStudentAppStateIfNeeded();
+
+                // Lançamento standalone "órfão": o iOS abriu o ícone sem 'app=aluno'
+                // na URL (o manifest personalizado pode ter sido ignorado) e este
+                // aparelho não tem dados de professor (lista de alunos) — ou seja,
+                // é claramente um aparelho de aluno, então tratamos como tal.
+                const isOrphanLaunch = params.get('app') !== 'aluno';
+                if(isOrphanLaunch && !STATE.studentApp.activeCode && (!STATE.alunos || STATE.alunos.length === 0)) {
+                    // Sem código salvo neste aparelho: manda para a tela de login
+                    // do aluno em vez da tela cheia do professor.
+                    document.body.classList.add('student-standalone');
+                    const btn = document.querySelector('nav button[onclick*="tab-app"]');
+                    showTab('tab-app', btn);
+                    renderStudentDashboard();
+                    return;
                 }
+                if(isOrphanLaunch && !STATE.studentApp.activeCode) return; // provável aparelho do professor, não mexe
+
                 if(STATE.studentApp.activeCode) persistStudentAppState();
-                renderInstallBanner();
+                setupStudentInstallExperience(STATE.studentApp.activeCode);
                 const btn = document.querySelector('nav button[onclick*="tab-app"]');
                 showTab('tab-app', btn);
                 const activeCode = STATE.studentApp.activeCode;
                 if(activeCode && isCloudConfigured()) {
-                    const cloudPlan = await cloudFetchPlan(activeCode);
+                    let cloudPlan = await cloudFetchPlan(activeCode);
+                    if(!cloudPlan) {
+                        // Primeira tentativa pode falhar em navegadores embutidos (WhatsApp/Instagram)
+                        // com conexão ainda instável logo na abertura. Tenta mais uma vez.
+                        await new Promise(r => setTimeout(r, 800));
+                        cloudPlan = await cloudFetchPlan(activeCode);
+                    }
                     if(cloudPlan) {
                         STATE.studentPlans[studentKey(cloudPlan.aluno)] = cloudPlan;
                         saveToDB('studentPlans', STATE.studentPlans);
+                    } else if(!STATE.studentPlans[studentKey(findStudentPlanByCode(activeCode)?.aluno || '')]) {
+                        console.warn('[NT] Não foi possível carregar a ficha da nuvem para o código', activeCode);
+                        showToast('Não foi possível sincronizar sua ficha agora. Puxe a tela para atualizar ou reabra o link.', 'error');
                     }
                     startStudentSessionSync(activeCode);
                 }
@@ -6213,39 +6243,18 @@ function restoreStudentAppStateIfNeeded() {
     });
 }
 
-// Reescreve o manifest com o código do aluno embutido no start_url, pra que
-// "Adicionar à Tela de Início" (Android e iOS) abra direto na ficha dele.
-// Usa data: URI (conteúdo embutido na própria URL) em vez de blob: — blob:
-// depende do registro de blobs da aba, que o processo nativo de instalação
-// do iOS pode não conseguir resolver. data: é autocontida, sem essa dependência.
-// Roda de forma síncrona (sem fetch/await) pra estar pronta o quanto antes.
+// Reescreve o manifest dinamicamente com o código do aluno embutido no start_url,
+// pra que "Adicionar à Tela de Início" (Android e iOS) abra direto na ficha dele,
+// e não na tela do professor.
 function setupStudentInstallExperience(code) {
     try {
         if(code) {
-            const base = location.href;
-            const personalizedUrl = new URL(`./index.html?app=aluno&code=${encodeURIComponent(code)}`, base).href;
-            const scopeUrl = new URL('./', base).href;
-            const manifest = {
-                name: 'Nicolas Trainer — Meu Treino',
-                short_name: 'Meu Treino',
-                description: 'Sua ficha de treino, cargas e frequência.',
-                id: personalizedUrl,
-                start_url: personalizedUrl,
-                scope: scopeUrl,
-                display: 'standalone',
-                orientation: 'portrait',
-                background_color: '#080810',
-                theme_color: '#080810',
-                icons: [
-                    { src: new URL('app-icon.svg', base).href, sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
-                    { src: new URL('icon-192.png', base).href, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-                    { src: new URL('icon-512.png', base).href, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
-                ]
-            };
-            const json = JSON.stringify(manifest);
-            const dataUri = 'data:application/manifest+json;base64,' + btoa(unescape(encodeURIComponent(json)));
+            // URL real (não blob:) para que o "Adicionar à Tela de Início" do iOS
+            // (que roda fora do JS da página) consiga buscar o manifest de verdade.
+            // O Service Worker intercepta essa URL e devolve o manifest com o
+            // código do aluno já embutido no start_url.
             const link = document.getElementById('nt-manifest-link');
-            if(link) link.href = dataUri;
+            if(link) link.href = `./manifest.webmanifest?code=${encodeURIComponent(code)}`;
         }
         renderInstallBanner();
     } catch(e) { console.error('[NT] setupStudentInstallExperience error:', e); }

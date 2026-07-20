@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'nicolas-trainer-v7-10';
+const CACHE_NAME = 'nicolas-trainer-v7-12';
 const LOCAL_ASSETS = [
   './',
   './index.html',
@@ -35,6 +35,27 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(event.request.url);
   const isLocal = url.origin === location.origin;
+
+  // Personaliza o manifest.webmanifest quando pedido com ?code=XXXX na URL.
+  // Isso substitui a técnica antiga de blob: URL, que o "Adicionar à Tela de
+  // Início" do iOS não consegue ler (ele busca o manifest pela rede/SW, e
+  // blob: só existe dentro da memória da própria aba). Como esta é uma URL
+  // https normal, o iOS consegue buscá-la de verdade através deste SW.
+  if (isLocal && url.pathname.endsWith('/manifest.webmanifest') && url.searchParams.has('code')) {
+    const code = url.searchParams.get('code');
+    event.respondWith(
+      fetch('./manifest.webmanifest').then(r => r.json()).then(manifest => {
+        const personalizedUrl = `./index.html?app=aluno&code=${encodeURIComponent(code)}`;
+        manifest.start_url = personalizedUrl;
+        manifest.id = personalizedUrl;
+        manifest.short_name = 'Meu Treino';
+        return new Response(JSON.stringify(manifest), {
+          headers: { 'Content-Type': 'application/manifest+json' }
+        });
+      }).catch(() => fetch(event.request))
+    );
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)
