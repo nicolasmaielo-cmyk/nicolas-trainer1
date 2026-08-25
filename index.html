@@ -331,11 +331,38 @@
 
         /* Empty state */
         .empty-state {
-            text-align: center; padding: 40px 20px;
+            text-align: center; padding: 36px 20px;
             color: var(--text-dim);
         }
-        .empty-state i { font-size: 2.5rem; margin-bottom: 10px; opacity: 0.3; display: block; }
-        .empty-state p { font-size: 0.88rem; }
+        .empty-state i {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 56px; height: 56px;
+            margin: 0 auto 14px;
+            border-radius: 50%;
+            background: linear-gradient(160deg, var(--primary-dim), rgba(108,99,255,0.02));
+            color: var(--primary);
+            font-size: 1.35rem;
+            opacity: 1;
+        }
+        .empty-state p {
+            font-size: 0.87rem;
+            color: var(--text-muted);
+            max-width: 280px;
+            margin: 0 auto;
+            line-height: 1.55;
+        }
+        .empty-state p strong { color: var(--text-main); }
+        .empty-state-hint {
+            display: block;
+            margin-top: 6px;
+            font-size: 0.74rem;
+            color: var(--text-dim);
+            max-width: 280px;
+            margin-left: auto;
+            margin-right: auto;
+        }
 
         /* Modais */
         .modal {
@@ -1325,10 +1352,57 @@
             gap: 8px;
             align-items: flex-start;
         }
-        .student-exercise-title strong {
-            font-size: 0.9rem;
-            line-height: 1.3;
+        .student-exercise-title .ex-name-wrap {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            min-width: 0;
         }
+        .ex-index-chip {
+            flex: 0 0 auto;
+            width: 22px;
+            height: 22px;
+            border-radius: 7px;
+            background: var(--primary-dim);
+            color: var(--primary);
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 0.76rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 1px;
+        }
+        .student-exercise-title strong {
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 1.04rem;
+            line-height: 1.28;
+            color: var(--text-main);
+            display: block;
+        }
+        .student-exercise-group {
+            display: block;
+            color: var(--text-dim);
+            font-size: 0.64rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-top: 2px;
+        }
+        .student-exercise-note {
+            display: flex;
+            gap: 7px;
+            align-items: flex-start;
+            background: var(--warning-dim);
+            border: 1px solid rgba(255,179,0,0.25);
+            border-radius: 8px;
+            padding: 7px 10px;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            line-height: 1.4;
+        }
+        .student-exercise-note i { color: var(--warning); font-size: 0.75rem; margin-top: 2px; flex: 0 0 auto; }
         .student-set-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
@@ -1573,11 +1647,27 @@
         }
         .load-progression-list { display: flex; flex-direction: column; gap: 10px; }
         .load-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
             border: 1px solid var(--border);
             border-radius: var(--radius);
             background: var(--bg-input);
             padding: 12px;
         }
+        .load-icon {
+            flex: 0 0 auto;
+            width: 34px; height: 34px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+        .load-icon.up { background: linear-gradient(160deg, rgba(0,212,170,0.2), rgba(0,212,170,0.04)); color: var(--success); }
+        .load-icon.down { background: linear-gradient(160deg, rgba(255,92,122,0.2), rgba(255,92,122,0.04)); color: var(--danger); }
+        .load-icon.flat { background: linear-gradient(160deg, rgba(154,154,176,0.18), rgba(154,154,176,0.04)); color: var(--text-muted); }
+        .load-body { flex: 1; min-width: 0; }
         .load-card-head {
             display: flex;
             justify-content: space-between;
@@ -1587,20 +1677,24 @@
         }
         .load-card-head strong { font-size: 0.86rem; }
         .load-trend {
-            font-size: 0.74rem;
+            font-size: 0.7rem;
             font-weight: 700;
             display: inline-flex;
             align-items: center;
             gap: 4px;
             white-space: nowrap;
+            padding: 3px 8px;
+            border-radius: 999px;
         }
-        .load-trend.up { color: var(--success); }
-        .load-trend.down { color: var(--danger); }
-        .load-trend.flat { color: var(--text-muted); }
+        .load-trend.up { color: var(--success); background: rgba(0,212,170,0.12); }
+        .load-trend.down { color: var(--danger); background: rgba(255,92,122,0.12); }
+        .load-trend.flat { color: var(--text-muted); background: rgba(154,154,176,0.1); }
         .load-spark-svg { width: 100%; height: 56px; display: block; }
         .load-card-foot {
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            gap: 8px;
             color: var(--text-dim);
             font-size: 0.72rem;
             margin-top: 4px;
@@ -3587,7 +3681,7 @@ function renderExercises() {
     container.innerHTML = '';
 
     if(exs.length === 0) {
-        container.innerHTML = `<div class="empty-state"><i class="fas fa-dumbbell"></i><p>Nenhum exercício neste treino.<br>Clique em <strong>Adicionar Exercício</strong> para começar.</p></div>`;
+        container.innerHTML = `<div class="empty-state"><i class="fas fa-dumbbell"></i><p>Nenhum exercício neste treino ainda.</p><span class="empty-state-hint">Clique em <strong>Adicionar Exercício</strong> para começar a montar a ficha.</span></div>`;
         dragHint.style.display = 'none';
         return;
     }
@@ -3930,7 +4024,9 @@ function renderAlunos() {
     const filtered = STATE.alunos.filter(a => (a.nome || a).toLowerCase().includes(q));
 
     if(filtered.length === 0) {
-        c.innerHTML = `<div class="empty-state" style="padding:20px;"><i class="fas fa-users"></i><p>Nenhum aluno encontrado.</p></div>`;
+        c.innerHTML = STATE.alunos.length
+            ? `<div class="empty-state" style="padding:20px;"><i class="fas fa-magnifying-glass"></i><p>Nenhum aluno encontrado para "<strong>${escapeHtml(q)}</strong>".</p><span class="empty-state-hint">Confira a grafia ou limpe a busca.</span></div>`
+            : `<div class="empty-state" style="padding:20px;"><i class="fas fa-users"></i><p>Você ainda não tem alunos cadastrados.</p><span class="empty-state-hint">Preencha o formulário acima para adicionar o primeiro.</span></div>`;
         return;
     }
 
@@ -4032,7 +4128,7 @@ function renderHistorico() {
     const c = document.getElementById('historico-list');
     if(!c) return;
     if(!aluno || !STATE.historico[aluno] || STATE.historico[aluno].length === 0) {
-        c.innerHTML = `<div class="empty-state" style="padding:20px;"><i class="fas fa-history"></i><p>Nenhuma versão salva para este aluno.</p></div>`;
+        c.innerHTML = `<div class="empty-state" style="padding:20px;"><i class="fas fa-clock-rotate-left"></i><p>Nenhuma versão salva para este aluno ainda.</p><span class="empty-state-hint">Salve uma versão da ficha para poder voltar a ela depois.</span></div>`;
         return;
     }
     c.innerHTML = STATE.historico[aluno].map((snap, i) => `
@@ -5416,7 +5512,7 @@ function renderProfessorAppPanel() {
                ${renderLoadProgressionList(plan, buildStudentGroupLoadSeries, 'Ainda não há cargas registradas por grupo muscular.', 'bar')}
                <div class="load-section-title" style="margin-top:16px;"><i class="fas fa-star"></i> Histórico de Recordes</div>
                ${renderRecordHistoryList(plan)}`
-            : '<div class="empty-state" style="padding:18px;"><i class="fas fa-chart-line"></i><p>Libere a ficha no app para acompanhar a progressão de carga.</p></div>';
+            : '<div class="empty-state" style="padding:18px;"><i class="fas fa-lock"></i><p>Progressão de carga indisponível.</p><span class="empty-state-hint">Libere a ficha no app deste aluno para começar a acompanhar a evolução.</span></div>';
     }
     if(freqBox) freqBox.innerHTML = renderFrequencyPanel(aluno);
 }
@@ -5820,7 +5916,7 @@ function buildStudentGroupLoadSeries(plan) {
 function renderLoadSparklineSVG(points) {
     const w = 260, h = 56, pad = 6;
     if(points.length < 2) {
-        return `<svg viewBox="0 0 ${w} ${h}" class="load-spark-svg"><circle cx="${w / 2}" cy="${h / 2}" r="3.4" fill="#00d4aa"></circle></svg>`;
+        return `<svg viewBox="0 0 ${w} ${h}" class="load-spark-svg"><circle cx="${w / 2}" cy="${h / 2}" r="3.4" fill="#ffb300"></circle></svg>`;
     }
     const loads = points.map(p => p.load);
     const min = Math.min(...loads), max = Math.max(...loads);
@@ -5830,11 +5926,19 @@ function renderLoadSparklineSVG(points) {
         x: pad + i * stepX,
         y: h - pad - ((p.load - min) / range) * (h - pad * 2)
     }));
+    let prIndex = 0;
+    points.forEach((p, i) => { if(p.load >= points[prIndex].load) prIndex = i; });
     const path = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
     const areaPath = `${path} L${coords[coords.length - 1].x.toFixed(1)},${h - pad} L${coords[0].x.toFixed(1)},${h - pad} Z`;
-    const dots = coords.map((c, i) => `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${i === coords.length - 1 ? 3.4 : 2}" fill="${i === coords.length - 1 ? '#00d4aa' : '#6c63ff'}" />`).join('');
+    const dots = coords.map((c, i) => {
+        const isPR = i === prIndex;
+        const r = isPR ? 4 : 2;
+        const fill = isPR ? '#ffb300' : '#6c63ff';
+        const glow = isPR ? `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="7.5" fill="#ffb300" opacity="0.18"></circle>` : '';
+        return `${glow}<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${r}" fill="${fill}" />`;
+    }).join('');
     return `<svg viewBox="0 0 ${w} ${h}" class="load-spark-svg" preserveAspectRatio="none">
-        <path d="${areaPath}" fill="#00d4aa" opacity="0.14"></path>
+        <path d="${areaPath}" fill="#00d4aa" opacity="0.12"></path>
         <path d="${path}" fill="none" stroke="#00d4aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
         ${dots}
     </svg>`;
@@ -5849,12 +5953,14 @@ function renderLoadBarChartSVG(points) {
     const plotH = h - pad - bottomPad;
     const stepX = (w - pad * 2) / points.length;
     const barW = Math.max(6, stepX * 0.55);
+    let prIndex = 0;
+    points.forEach((p, i) => { if(p.load >= points[prIndex].load) prIndex = i; });
     const bars = points.map((p, i) => {
         const barH = Math.max(2, (p.load / max) * plotH);
         const x = pad + i * stepX + (stepX - barW) / 2;
         const y = h - bottomPad - barH;
-        const isLast = i === points.length - 1;
-        return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="2" fill="${isLast ? '#00d4aa' : '#6c63ff'}" opacity="${isLast ? '1' : '0.8'}"></rect>`;
+        const isPR = i === prIndex;
+        return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="3" fill="${isPR ? '#ffb300' : '#6c63ff'}" opacity="${isPR ? '1' : '0.75'}"></rect>`;
     }).join('');
     return `<svg viewBox="0 0 ${w} ${h}" class="load-spark-svg" preserveAspectRatio="none">
         <line x1="${pad}" y1="${(h - bottomPad).toFixed(1)}" x2="${(w - pad).toFixed(1)}" y2="${(h - bottomPad).toFixed(1)}" stroke="#24243a" stroke-width="1"></line>
@@ -5878,7 +5984,7 @@ function buildStudentRecordHistory(plan) {
 function renderRecordHistoryList(plan) {
     const records = buildStudentRecordHistory(plan);
     if(!records.length) {
-        return '<div class="empty-state" style="padding:18px;"><i class="fas fa-star"></i><p>Nenhum recorde de carga registrado ainda.</p></div>';
+        return '<div class="empty-state" style="padding:18px;"><i class="fas fa-star"></i><p>Nenhum recorde de carga ainda.</p><span class="empty-state-hint">Assim que você superar uma carga anterior, ela aparece aqui.</span></div>';
     }
     return `<div class="load-progression-list">${records.map(r => {
         const date = new Date(r.date).toLocaleDateString('pt-BR');
@@ -5908,13 +6014,15 @@ function renderLoadProgressionList(plan, seriesFn = buildStudentLoadSeries, empt
     const series = seriesFn(plan);
     const names = Object.keys(series);
     if(!names.length) {
-        return `<div class="empty-state" style="padding:18px;"><i class="fas fa-chart-line"></i><p>${escapeHtml(emptyMsg)}</p></div>`;
+        return `<div class="empty-state" style="padding:18px;"><i class="fas fa-chart-line"></i><p>${escapeHtml(emptyMsg)}</p><span class="empty-state-hint">O gráfico aparece assim que a primeira carga for registrada.</span></div>`;
     }
+    const sectionIcon = chartType === 'bar' ? 'fa-layer-group' : 'fa-dumbbell';
     names.sort((a, b) => series[b].length - series[a].length);
     return `<div class="load-progression-list">${names.map(name => {
         const points = series[name];
         const first = points[0].load;
         const last = points[points.length - 1].load;
+        const maxLoad = Math.max(...points.map(p => p.load));
         const delta = roundVolume(last - first);
         const deltaPct = first ? Math.round((delta / first) * 100) : 0;
         const trendClass = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
@@ -5922,14 +6030,17 @@ function renderLoadProgressionList(plan, seriesFn = buildStudentLoadSeries, empt
         const lastDate = new Date(points[points.length - 1].date).toLocaleDateString('pt-BR');
         const trendText = delta === 0 ? 'estável' : `${delta > 0 ? '+' : ''}${formatVolume(delta)}kg (${deltaPct > 0 ? '+' : ''}${deltaPct}%)`;
         return `<div class="load-card">
-            <div class="load-card-head">
-                <strong>${escapeHtml(name)}</strong>
-                <span class="load-trend ${trendClass}"><i class="fas ${trendIcon}"></i> ${trendText}</span>
-            </div>
-            ${chartType === 'bar' ? renderLoadBarChartSVG(points) : renderLoadSparklineSVG(points)}
-            <div class="load-card-foot">
-                <span>${points.length} registro(s)</span>
-                <span>Última: ${formatVolume(last)}kg em ${lastDate}</span>
+            <div class="load-icon ${trendClass}"><i class="fas ${sectionIcon}"></i></div>
+            <div class="load-body">
+                <div class="load-card-head">
+                    <strong>${escapeHtml(name)}</strong>
+                    <span class="load-trend ${trendClass}"><i class="fas ${trendIcon}"></i> ${trendText}</span>
+                </div>
+                ${chartType === 'bar' ? renderLoadBarChartSVG(points) : renderLoadSparklineSVG(points)}
+                <div class="load-card-foot">
+                    <span>${points.length} registro(s)</span>
+                    <span><i class="fas fa-trophy" style="color:var(--warning);"></i> pico ${formatVolume(maxLoad)}kg · última ${formatVolume(last)}kg em ${lastDate}</span>
+                </div>
             </div>
         </div>`;
     }).join('')}</div>`;
@@ -6017,7 +6128,7 @@ function renderFrequencyHeatmap(stats) {
 function renderFrequencyPanel(aluno) {
     const stats = computeAttendanceStats(aluno);
     if(!stats.totalDays) {
-        return '<div class="empty-state" style="padding:18px;"><i class="fas fa-calendar-xmark"></i><p>Nenhuma presença registrada ainda.</p></div>';
+        return '<div class="empty-state" style="padding:18px;"><i class="fas fa-calendar-xmark"></i><p>Nenhuma presença registrada ainda.</p><span class="empty-state-hint">Marque presença no seu primeiro treino para começar a acompanhar sua frequência.</span></div>';
     }
     const maxCount = Math.max(...stats.weekdayCount, 1);
     const bars = stats.weekdayNames.map((day, i) => {
@@ -6149,9 +6260,9 @@ function renderStudentDashboard() {
             </div>
             ${viewTabs}
             <div class="load-section-title"><i class="fas fa-dumbbell"></i> Progressão por Exercício</div>
-            ${renderLoadProgressionList(plan, buildStudentLoadSeries, 'Ainda não há cargas registradas pelo aluno.')}
+            ${renderLoadProgressionList(plan, buildStudentLoadSeries, 'Você ainda não registrou cargas.')}
             <div class="load-section-title" style="margin-top:16px;"><i class="fas fa-layer-group"></i> Progressão por Grupo Muscular</div>
-            ${renderLoadProgressionList(plan, buildStudentGroupLoadSeries, 'Ainda não há cargas registradas por grupo muscular.', 'bar')}
+            ${renderLoadProgressionList(plan, buildStudentGroupLoadSeries, 'Você ainda não registrou cargas por grupo muscular.', 'bar')}
             <div class="load-section-title" style="margin-top:16px;"><i class="fas fa-star"></i> Histórico de Recordes</div>
             ${renderRecordHistoryList(plan)}
         `;
@@ -6188,10 +6299,15 @@ function renderStudentDashboard() {
                 ${buildExerciseMediaTile(ex.grupo, ex.nome, media)}
                 <div style="flex:1; min-width:0;">
                     <div class="student-exercise-title">
-                        <strong>${i + 1}. ${escapeHtml(ex.nome)}</strong>
-                        <span class="exercise-group-tag">${escapeHtml(ex.grupo)}</span>
+                        <div class="ex-name-wrap">
+                            <span class="ex-index-chip">${i + 1}</span>
+                            <div style="min-width:0;">
+                                <strong>${escapeHtml(ex.nome)}</strong>
+                                <span class="student-exercise-group">${escapeHtml(ex.grupo)}</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="exercise-details">
+                    <div class="exercise-details" style="margin-top:8px;">
                         <span class="ex-badge"><b>${sets}</b> séries</span>
                         <span class="ex-badge"><b>${escapeHtml(ex.reps || '')}</b> reps</span>
                         <span class="ex-badge"><i class="fas fa-clock" style="font-size:0.7rem;"></i> ${escapeHtml(ex.rest || '')}</span>
@@ -6199,7 +6315,7 @@ function renderStudentDashboard() {
                     </div>
                 </div>
             </div>
-            ${ex.obs ? `<div class="student-mini-text">${escapeHtml(ex.obs)}</div>` : ''}
+            ${ex.obs ? `<div class="student-exercise-note"><i class="fas fa-comment-dots"></i><span>${escapeHtml(ex.obs)}</span></div>` : ''}
             <div class="grid-2" style="gap:8px;">
                 <input id="student-perf-carga-${i}" type="text" value="${escapeAttr(perf.carga || '')}" placeholder="Carga feita" onchange="saveStudentPerformance(${i})" style="margin-bottom:0;">
                 <input id="student-perf-reps-${i}" type="text" value="${escapeAttr(perf.reps || '')}" placeholder="Reps reais" onchange="saveStudentPerformance(${i})" style="margin-bottom:0;">
@@ -6208,7 +6324,7 @@ function renderStudentDashboard() {
             <div class="student-set-grid">${setButtons}</div>
             ${media.videoUrl ? `<button class="btn btn-ghost btn-small" style="color:var(--accent);border-color:var(--accent-dim);" onclick="openExerciseViewer(decodeURIComponent('${encodeURIComponent(ex.grupo)}'),decodeURIComponent('${encodeURIComponent(ex.nome)}'))"><i class="fas fa-play"></i> Ver vídeo</button>` : ''}
         </div>`;
-    }).join('') : '<div class="empty-state"><i class="fas fa-dumbbell"></i><p>Nenhum exercício neste treino.</p></div>';
+    }).join('') : '<div class="empty-state"><i class="fas fa-dumbbell"></i><p>Nenhum exercício neste treino ainda.</p><span class="empty-state-hint">Peça ao seu professor para liberar os exercícios por aqui.</span></div>';
 
     dash.innerHTML = `
         <div class="student-hero">
@@ -6241,7 +6357,7 @@ function renderAttendancePanel() {
     const done = rows.filter(s => s.finishedAt).length;
     summary.innerHTML = `<i class="fas fa-calendar-check"></i> ${rows.length} check-in(s) - ${done} concluído(s)`;
     if(!rows.length) {
-        list.innerHTML = '<div class="empty-state" style="padding:20px;"><i class="fas fa-clipboard-check"></i><p>Nenhuma presença marcada.</p></div>';
+        list.innerHTML = '<div class="empty-state" style="padding:20px;"><i class="fas fa-clipboard-check"></i><p>Nenhuma presença marcada ainda.</p><span class="empty-state-hint">Os check-ins do aluno aparecem aqui assim que ele treinar.</span></div>';
         return;
     }
     list.innerHTML = rows.slice(0, 40).map(s => {
@@ -7362,7 +7478,7 @@ function renderMediaLibrary() {
     if(q) list = list.filter(e => e.nome.toLowerCase().includes(q) || e.grupoMuscular.toLowerCase().includes(q));
     list.sort((a,b) => a.grupoMuscular.localeCompare(b.grupoMuscular) || a.nome.localeCompare(b.nome));
     if(!list.length) {
-        container.innerHTML = `<div class="empty-state"><i class="fas fa-search"></i><p>Nenhum exercício encontrado.</p></div>`;
+        container.innerHTML = `<div class="empty-state"><i class="fas fa-search"></i><p>Nenhum exercício encontrado.</p><span class="empty-state-hint">Tente outro termo ou selecione outro grupo muscular.</span></div>`;
         return;
     }
     container.innerHTML = list.slice(0, 200).map(ex => {
