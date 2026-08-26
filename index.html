@@ -30,7 +30,7 @@
             --accent-dim: rgba(0,212,170,0.12);
             --text-main: #eeeef5;
             --text-muted: #7f7f9a;
-            --text-dim: #44445a;
+            --text-dim: #6a6a84;
             --danger: #ff5c7a;
             --danger-dim: rgba(255,92,122,0.15);
             --success: #00d4aa;
@@ -1608,7 +1608,7 @@
         /* Student view tabs (Treino / Carga / Frequência) */
         .student-view-tabs {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 6px;
         }
         .student-view-tabs button {
@@ -1625,6 +1625,7 @@
             align-items: center;
             justify-content: center;
             gap: 5px;
+            padding: 0 4px;
         }
         .student-view-tabs button.active {
             background: var(--primary-dim);
@@ -1852,6 +1853,132 @@
         }
         .record-new-tag { color: var(--accent); font-weight: 700; }
 
+        /* Evolução (fotos antes/depois) */
+        .evo-upload-box { margin-bottom: 14px; }
+        .evo-upload-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            cursor: pointer;
+        }
+        .evo-upload-btn input[type="file"] { display: none; }
+        .evo-compare {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .evo-compare-item {
+            flex: 1;
+            min-width: 0;
+            text-align: center;
+        }
+        .evo-compare-label {
+            font-size: 0.66rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+        .evo-compare-item img {
+            width: 100%;
+            aspect-ratio: 3/4;
+            object-fit: cover;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--bg-input);
+            cursor: pointer;
+            display: block;
+        }
+        .evo-compare-date { font-size: 0.68rem; color: var(--text-dim); margin-top: 5px; }
+        .evo-compare-arrow { flex: 0 0 auto; color: var(--text-dim); font-size: 1rem; }
+        .evo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+            gap: 8px;
+        }
+        .evo-thumb { position: relative; border-radius: 10px; overflow: hidden; }
+        .evo-thumb img {
+            width: 100%;
+            aspect-ratio: 1/1;
+            object-fit: cover;
+            display: block;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .evo-thumb-date {
+            position: absolute;
+            left: 4px; bottom: 4px;
+            background: rgba(5,5,10,0.72);
+            color: var(--text-main);
+            font-size: 0.58rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 6px;
+            pointer-events: none;
+        }
+        .evo-thumb-del {
+            position: absolute;
+            top: 4px; right: 4px;
+            width: 22px; height: 22px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(5,5,10,0.72);
+            color: var(--danger);
+            font-size: 0.68rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .evo-gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+        }
+        .evo-card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-input);
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.2s, transform 0.15s;
+        }
+        .evo-card:hover { border-color: var(--border-hover); transform: translateY(-2px); }
+        .evo-card-compare { display: flex; }
+        .evo-card-compare img {
+            width: 50%;
+            aspect-ratio: 3/4;
+            object-fit: cover;
+            display: block;
+        }
+        .evo-card-placeholder, .evo-card-empty {
+            width: 100%;
+            aspect-ratio: 16/10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: var(--bg-card);
+            color: var(--text-dim);
+            font-size: 0.72rem;
+        }
+        .evo-card-placeholder { width: 50%; aspect-ratio: 3/4; }
+        .evo-card-empty i, .evo-card-placeholder i { font-size: 1.3rem; opacity: 0.6; }
+        .evo-card-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+        }
+        .evo-card-info strong { display: block; font-size: 0.84rem; }
+        .evo-card-info span { display: block; font-size: 0.68rem; color: var(--text-dim); margin-top: 2px; }
+
         /* Professor sub-tabs (Resumo / Carga / Frequência) */
         .prof-subtabs {
             display: grid;
@@ -1930,6 +2057,7 @@
     <button onclick="showTab('tab-historico', this)"><i class="fas fa-history"></i> Histórico</button>
     <button onclick="showTab('tab-media', this)"><i class="fas fa-photo-video"></i> Mídia</button>
     <button onclick="showTab('tab-app', this)"><i class="fas fa-mobile-screen-button"></i> App Aluno</button>
+    <button onclick="showTab('tab-evolucao', this)"><i class="fas fa-camera-retro"></i> Evolução</button>
     <button onclick="showTab('tab-config', this)"><i class="fas fa-cog"></i> Config</button>
 </nav>
 
@@ -2173,6 +2301,11 @@
     </div>
 </div>
 
+<div id="photo-viewer" onclick="closePhotoViewer()" style="display:none; position:fixed; inset:0; z-index:100000; background:rgba(5,5,10,0.92); align-items:center; justify-content:center; padding:20px;">
+    <button onclick="closePhotoViewer()" style="position:absolute; top:16px; right:16px; width:40px; height:40px; border-radius:50%; border:1px solid var(--border); background:var(--bg-card); color:var(--text-main); font-size:1rem; cursor:pointer;"><i class="fas fa-times"></i></button>
+    <img id="photo-viewer-img" src="" alt="Foto de evolução" onclick="event.stopPropagation()" style="max-width:100%; max-height:88vh; border-radius:12px; object-fit:contain; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+</div>
+
 <!-- ===================== TAB: APP ALUNO ===================== -->
 <div id="tab-app" class="container">
     <div class="card trainer-only">
@@ -2258,6 +2391,29 @@
             </div>
         </div>
         <div id="attendance-list" class="attendance-list"></div>
+    </div>
+</div>
+
+<!-- ===================== TAB: EVOLUÇÃO (fotos antes/depois) ===================== -->
+<div id="tab-evolucao" class="container">
+    <div class="card trainer-only">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+            <h2 class="section-title" style="margin:0; border:none; padding:0;"><i class="fas fa-camera-retro"></i> Evolução dos Alunos</h2>
+        </div>
+        <input type="text" id="evolucao-search" placeholder="Buscar aluno..." oninput="renderEvolutionGalleryGrid()" style="margin-bottom:14px;">
+        <div id="evolucao-grid" class="evo-gallery-grid"></div>
+    </div>
+</div>
+
+<div id="evolucao-detail" style="display:none; position:fixed; inset:0; z-index:99998; background:var(--bg-dark); overflow-y:auto; padding:24px 16px;">
+    <div style="max-width:720px; margin:0 auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+            <h1 id="evolucao-detail-name" style="font-family:'Rajdhani',sans-serif; font-size:1.6rem; line-height:1.2;"></h1>
+            <button class="btn btn-ghost" onclick="closeEvolutionDetail()"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="evolucao-detail-compare"></div>
+        <div class="load-section-title" style="margin-top:16px; margin-bottom:6px;"><i class="fas fa-images"></i> Linha do tempo</div>
+        <div id="evolucao-detail-grid"></div>
     </div>
 </div>
 
@@ -2852,6 +3008,7 @@ const STATE = {
     mediaLib: {},  // key "Grupo||Nome" => { videoUrl, thumbUrl }
     studentPlans: {},
     studentSessions: [],
+    studentPhotos: {}, // { code: [ {id, url(base64), date, note}, ... ] }
     studentApp: { activeCode: '', workoutId: 'A', sessionId: '', view: 'treino' }
 };
 
@@ -3103,6 +3260,7 @@ function loadDataFromDB() {
     getFromDB('mediaLib', v => { if(v && typeof v === 'object') STATE.mediaLib = v; });
     getFromDB('studentPlans', v => { if(v && typeof v === 'object') STATE.studentPlans = v; renderStudentAppLight(); });
     getFromDB('studentSessions', v => { if(Array.isArray(v)) STATE.studentSessions = v; renderStudentAppLight(); });
+    getFromDB('studentPhotos', v => { if(v && typeof v === 'object') STATE.studentPhotos = v; });
     populateGrupoSelect();
     populatePrioridadeSelect();
     renderStudentAppLight();
@@ -3235,6 +3393,88 @@ function mergeCloudSessions(cloudSessions) {
     return changed;
 }
 
+/* ================================================================
+   FOTOS DE EVOLUÇÃO (antes/depois) — nt_plans/{code}/photos/{id}
+   ================================================================ */
+async function cloudSavePhoto(code, photo) {
+    if(!isCloudConfigured() || !code || !photo?.id) return;
+    const dbRef = await initCloudSync();
+    if(!dbRef) return;
+    try {
+        await dbRef.collection('nt_plans').doc(code).collection('photos').doc(photo.id).set(photo);
+    } catch(e) { console.error('[NT] cloudSavePhoto error:', e); }
+}
+
+async function cloudDeletePhoto(code, photoId) {
+    if(!isCloudConfigured() || !code || !photoId) return;
+    const dbRef = await initCloudSync();
+    if(!dbRef) return;
+    try {
+        await dbRef.collection('nt_plans').doc(code).collection('photos').doc(photoId).delete();
+    } catch(e) { console.error('[NT] cloudDeletePhoto error:', e); }
+}
+
+async function cloudFetchPhotos(code) {
+    if(!isCloudConfigured() || !code) return [];
+    const dbRef = await initCloudSync();
+    if(!dbRef) return [];
+    try {
+        const snap = await dbRef.collection('nt_plans').doc(code).collection('photos').get();
+        return snap.docs.map(d => d.data());
+    } catch(e) { console.error('[NT] cloudFetchPhotos error:', e); return []; }
+}
+
+async function cloudListenPhotos(code, onChange) {
+    if(!isCloudConfigured() || !code) return () => {};
+    const dbRef = await initCloudSync();
+    if(!dbRef) return () => {};
+    try {
+        return dbRef.collection('nt_plans').doc(code).collection('photos')
+            .onSnapshot(
+                snap => onChange(snap.docs.map(d => d.data())),
+                e => console.error('[NT] cloudListenPhotos error:', e)
+            );
+    } catch(e) {
+        console.error('[NT] cloudListenPhotos setup error:', e);
+        return () => {};
+    }
+}
+
+function mergeCloudPhotos(code, cloudPhotos) {
+    if(!code || !Array.isArray(cloudPhotos)) return false;
+    const sorted = cloudPhotos.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const changed = JSON.stringify(STATE.studentPhotos[code] || []) !== JSON.stringify(sorted);
+    if(changed) { STATE.studentPhotos[code] = sorted; saveToDB('studentPhotos', STATE.studentPhotos); }
+    return changed;
+}
+
+// Redimensiona e comprime a foto no navegador antes de salvar (documento do
+// Firestore tem limite de ~1MB, então evitamos subir a foto original da câmera).
+function compressImageFile(file, maxDim = 1000, quality = 0.72) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
+        reader.onload = () => {
+            const img = new Image();
+            img.onerror = () => reject(new Error('Falha ao carregar imagem'));
+            img.onload = () => {
+                let { width, height } = img;
+                if(width > maxDim || height > maxDim) {
+                    if(width > height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+                    else { width = Math.round(width * (maxDim / height)); height = maxDim; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width; canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 
 function showToast(msg, type='info', duration=3000) {
     const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', info: 'fa-info-circle' };
@@ -3303,6 +3543,7 @@ function showTab(tabId, btn) {
     if(tabId === 'tab-historico') { updateHistoricoSelects(); renderHistorico(); }
     if(tabId === 'tab-media') { populateMediaGrupoSelect(); renderMediaLibrary(); }
     if(tabId === 'tab-app') { renderStudentAppAll(); }
+    if(tabId === 'tab-evolucao') { renderEvolutionGallery(); }
 }
 
 // Abrir análise a partir da ficha — salva contexto completo
@@ -5056,7 +5297,8 @@ function exportData() {
             profile: STATE.profile,
             mediaLib: STATE.mediaLib,
             studentPlans: STATE.studentPlans,
-            studentSessions: STATE.studentSessions
+            studentSessions: STATE.studentSessions,
+            studentPhotos: STATE.studentPhotos
         };
         const a = document.createElement('a');
         const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
@@ -5092,6 +5334,7 @@ function importData() {
             if(data.mediaLib && typeof data.mediaLib === 'object') STATE.mediaLib = data.mediaLib;
             if(data.studentPlans && typeof data.studentPlans === 'object') STATE.studentPlans = data.studentPlans;
             if(Array.isArray(data.studentSessions)) STATE.studentSessions = data.studentSessions;
+            if(data.studentPhotos && typeof data.studentPhotos === 'object') STATE.studentPhotos = data.studentPhotos;
             saveToDB('alunos', STATE.alunos);
             saveToDB('treinos', STATE.treinosA_G);
             saveToDB('historico', STATE.historico);
@@ -5099,6 +5342,7 @@ function importData() {
             saveToDB('mediaLib', STATE.mediaLib);
             saveToDB('studentPlans', STATE.studentPlans);
             saveToDB('studentSessions', STATE.studentSessions);
+            saveToDB('studentPhotos', STATE.studentPhotos);
             showToast('Dados importados com sucesso!', 'success');
             setTimeout(() => location.reload(), 1500);
         } catch(err) {
@@ -5634,6 +5878,7 @@ async function enterStudentApp(code = '') {
     renderStudentDashboard();
     showToast(`Bem-vindo, ${plan.aluno}.`, 'success');
     startStudentSessionSync(plan.code);
+    startStudentPhotoSync(plan.code);
 }
 
 function startStudentSessionSync(code) {
@@ -5642,6 +5887,85 @@ function startStudentSessionSync(code) {
     cloudListenSessions(code, sessions => {
         if(mergeCloudSessions(sessions)) renderStudentDashboard();
     }).then(unsub => { studentSessionUnsub = unsub; });
+}
+
+let studentPhotoUnsub = null;
+function startStudentPhotoSync(code) {
+    if(!isCloudConfigured()) return;
+    if(studentPhotoUnsub) { studentPhotoUnsub(); studentPhotoUnsub = null; }
+    cloudListenPhotos(code, photos => {
+        if(mergeCloudPhotos(code, photos)) renderStudentDashboard();
+    }).then(unsub => { studentPhotoUnsub = unsub; });
+}
+
+async function addStudentEvolutionPhoto(input) {
+    const file = input.files?.[0];
+    if(!file) return;
+    const plan = findStudentPlanByCode(STATE.studentApp.activeCode);
+    if(!plan) { input.value = ''; return; }
+    if(!file.type.startsWith('image/')) { showToast('Selecione uma imagem.', 'error'); input.value = ''; return; }
+    input.disabled = true;
+    showToast('Enviando foto...', 'info', 2000);
+    try {
+        const dataUrl = await compressImageFile(file, 1000, 0.72);
+        if(dataUrl.length > 900000) {
+            showToast('Foto muito pesada mesmo após compactar. Tente outra foto.', 'error');
+            return;
+        }
+        const photo = {
+            id: `ph-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            url: dataUrl,
+            date: new Date().toISOString()
+        };
+        const list = STATE.studentPhotos[plan.code] || (STATE.studentPhotos[plan.code] = []);
+        list.push(photo);
+        list.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        saveToDB('studentPhotos', STATE.studentPhotos);
+        cloudSavePhoto(plan.code, photo);
+        renderStudentDashboard();
+        showToast('Foto adicionada à sua evolução!', 'success');
+    } catch(e) {
+        console.error('[NT] addStudentEvolutionPhoto error:', e);
+        showToast('Não foi possível processar a foto.', 'error');
+    } finally {
+        input.disabled = false;
+        input.value = '';
+    }
+}
+
+function deleteStudentEvolutionPhoto(photoId) {
+    const plan = findStudentPlanByCode(STATE.studentApp.activeCode);
+    if(!plan) return;
+    showConfirm('Excluir foto', 'Tem certeza que deseja excluir esta foto? Essa ação não pode ser desfeita.', () => {
+        STATE.studentPhotos[plan.code] = (STATE.studentPhotos[plan.code] || []).filter(p => p.id !== photoId);
+        saveToDB('studentPhotos', STATE.studentPhotos);
+        cloudDeletePhoto(plan.code, photoId);
+        renderStudentDashboard();
+        showToast('Foto excluída.', 'success');
+    });
+}
+
+function openStudentPhotoViewer(photoId) {
+    const plan = findStudentPlanByCode(STATE.studentApp.activeCode);
+    if(!plan) return;
+    openPhotoViewerFor(plan.code, photoId);
+}
+
+function openPhotoViewerFor(code, photoId) {
+    const photo = (STATE.studentPhotos[code] || []).find(p => p.id === photoId);
+    if(!photo) return;
+    const img = document.getElementById('photo-viewer-img');
+    const overlay = document.getElementById('photo-viewer');
+    if(!img || !overlay) return;
+    img.src = photo.url;
+    overlay.style.display = 'flex';
+}
+
+function closePhotoViewer() {
+    const img = document.getElementById('photo-viewer-img');
+    const overlay = document.getElementById('photo-viewer');
+    if(overlay) overlay.style.display = 'none';
+    if(img) img.src = '';
 }
 
 function setStudentWorkout(id) {
@@ -6160,6 +6484,48 @@ function renderFrequencyPanel(aluno) {
     `;
 }
 
+function renderStudentEvolutionPanel(plan) {
+    const photos = (STATE.studentPhotos[plan.code] || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const first = photos[0];
+    const last = photos.length > 1 ? photos[photos.length - 1] : null;
+
+    const compareBlock = photos.length ? `
+        <div class="evo-compare">
+            <div class="evo-compare-item">
+                <div class="evo-compare-label">Antes</div>
+                <img src="${first.url}" alt="Foto antes" onclick="openStudentPhotoViewer('${first.id}')">
+                <div class="evo-compare-date">${new Date(first.date).toLocaleDateString('pt-BR')}</div>
+            </div>
+            <div class="evo-compare-arrow"><i class="fas fa-arrow-right"></i></div>
+            <div class="evo-compare-item">
+                <div class="evo-compare-label">${last ? 'Agora' : 'Única foto'}</div>
+                <img src="${(last || first).url}" alt="Foto atual" onclick="openStudentPhotoViewer('${(last || first).id}')">
+                <div class="evo-compare-date">${new Date((last || first).date).toLocaleDateString('pt-BR')}</div>
+            </div>
+        </div>` : '';
+
+    const timeline = photos.length
+        ? `<div class="evo-grid">${photos.slice().reverse().map(p => `
+            <div class="evo-thumb">
+                <img src="${p.url}" alt="Foto de evolução" onclick="openStudentPhotoViewer('${p.id}')">
+                <button class="evo-thumb-del" onclick="event.stopPropagation();deleteStudentEvolutionPhoto('${p.id}')" title="Excluir foto"><i class="fas fa-trash"></i></button>
+                <div class="evo-thumb-date">${new Date(p.date).toLocaleDateString('pt-BR')}</div>
+            </div>`).join('')}</div>`
+        : `<div class="empty-state" style="padding:18px;"><i class="fas fa-camera-retro"></i><p>Nenhuma foto de evolução ainda.</p><span class="empty-state-hint">Envie sua primeira foto para começar a registrar sua evolução.</span></div>`;
+
+    return `
+        <div class="evo-upload-box">
+            <label class="btn btn-outline evo-upload-btn">
+                <i class="fas fa-camera"></i> Adicionar foto de evolução
+                <input type="file" accept="image/*" capture="environment" onchange="addStudentEvolutionPhoto(this)">
+            </label>
+        </div>
+        ${compareBlock}
+        <div class="load-section-title" style="margin-top:16px; margin-bottom:6px;"><i class="fas fa-images"></i> Linha do tempo (${photos.length})</div>
+        ${timeline}
+    `;
+}
+
 function renderStudentCheckinPanel(session) {
     const c = session?.checkin || {};
     return `<div class="student-checkin-panel">
@@ -6250,8 +6616,20 @@ function renderStudentDashboard() {
         <button class="${view === 'treino' ? 'active' : ''}" onclick="setStudentView('treino')"><i class="fas fa-dumbbell"></i> Treino</button>
         <button class="${view === 'carga' ? 'active' : ''}" onclick="setStudentView('carga')"><i class="fas fa-chart-line"></i> Carga</button>
         <button class="${view === 'frequencia' ? 'active' : ''}" onclick="setStudentView('frequencia')"><i class="fas fa-calendar-check"></i> Frequência</button>
+        <button class="${view === 'evolucao' ? 'active' : ''}" onclick="setStudentView('evolucao')"><i class="fas fa-camera-retro"></i> Evolução</button>
     </div>`;
 
+    if(view === 'evolucao') {
+        dash.innerHTML = `
+            <div class="student-hero">
+                <h3>${escapeHtml(plan.aluno)}</h3>
+                <p>${escapeHtml(sourceLabel)} - atualização ${updated}</p>
+            </div>
+            ${viewTabs}
+            ${renderStudentEvolutionPanel(plan)}
+        `;
+        return;
+    }
     if(view === 'carga') {
         dash.innerHTML = `
             <div class="student-hero">
@@ -6380,6 +6758,133 @@ function renderAttendancePanel() {
     }).join('');
 }
 
+/* ================================================================
+   GALERIA DE EVOLUÇÃO (todos os alunos juntos) — visão do professor
+   ================================================================ */
+async function renderEvolutionGallery() {
+    const container = document.getElementById('evolucao-grid');
+    if(!container) return;
+    container.innerHTML = '<div class="empty-state" style="padding:30px;"><i class="fas fa-spinner fa-spin"></i><p>Carregando fotos...</p></div>';
+
+    const withPlans = STATE.alunos
+        .map(a => a.nome || a)
+        .map(nome => getStudentPlanByName(nome))
+        .filter(Boolean);
+
+    if(isCloudConfigured()) {
+        await Promise.all(withPlans.map(async plan => {
+            const photos = await cloudFetchPhotos(plan.code);
+            mergeCloudPhotos(plan.code, photos);
+        }));
+    }
+
+    renderEvolutionGalleryGrid();
+}
+
+function renderEvolutionGalleryGrid() {
+    const container = document.getElementById('evolucao-grid');
+    if(!container) return;
+    const q = (document.getElementById('evolucao-search')?.value || '').toLowerCase();
+    const withPlans = STATE.alunos
+        .map(a => a.nome || a)
+        .filter(nome => nome.toLowerCase().includes(q))
+        .map(nome => getStudentPlanByName(nome))
+        .filter(Boolean);
+
+    if(!withPlans.length) {
+        container.innerHTML = '<div class="empty-state" style="padding:30px;"><i class="fas fa-camera-retro"></i><p>Nenhum aluno com ficha liberada ainda.</p><span class="empty-state-hint">Libere a ficha no App Aluno para habilitar o registro de fotos.</span></div>';
+        return;
+    }
+
+    container.innerHTML = withPlans.map(plan => {
+        const photos = (STATE.studentPhotos[plan.code] || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        const first = photos[0];
+        const last = photos.length > 1 ? photos[photos.length - 1] : null;
+        const initials = plan.aluno.split(' ').map(w => w[0]).filter(Boolean).join('').substring(0, 2).toUpperCase();
+        const thumbs = photos.length
+            ? `<div class="evo-card-compare">
+                <img src="${first.url}" alt="Antes">
+                ${last ? `<img src="${last.url}" alt="Agora">` : '<div class="evo-card-placeholder"><i class="fas fa-camera"></i></div>'}
+               </div>`
+            : `<div class="evo-card-empty"><i class="fas fa-camera-retro"></i><span>Sem fotos ainda</span></div>`;
+        const lastDate = photos.length ? new Date(photos[photos.length - 1].date).toLocaleDateString('pt-BR') : '—';
+        return `<div class="evo-card" onclick="openEvolutionDetail('${escapeAttr(plan.code)}')">
+            ${thumbs}
+            <div class="evo-card-info">
+                <div class="aluno-avatar">${initials}</div>
+                <div style="min-width:0;">
+                    <strong>${escapeHtml(plan.aluno)}</strong>
+                    <span>${photos.length} foto(s) · última ${lastDate}</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+let evolucaoDetailCode = '';
+function openEvolutionDetail(code) {
+    const plan = Object.values(STATE.studentPlans).find(p => p.code === code);
+    if(!plan) return;
+    evolucaoDetailCode = code;
+    document.getElementById('evolucao-detail-name').textContent = plan.aluno;
+    renderEvolutionDetail();
+    document.getElementById('evolucao-detail').style.display = 'block';
+}
+
+function closeEvolutionDetail() {
+    document.getElementById('evolucao-detail').style.display = 'none';
+    evolucaoDetailCode = '';
+}
+
+function renderEvolutionDetail() {
+    const code = evolucaoDetailCode;
+    if(!code) return;
+    const compareEl = document.getElementById('evolucao-detail-compare');
+    const gridEl = document.getElementById('evolucao-detail-grid');
+    if(!compareEl || !gridEl) return;
+    const photos = (STATE.studentPhotos[code] || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+    if(!photos.length) {
+        compareEl.innerHTML = '';
+        gridEl.innerHTML = '<div class="empty-state" style="padding:20px;"><i class="fas fa-camera-retro"></i><p>Este aluno ainda não enviou fotos.</p></div>';
+        return;
+    }
+
+    const first = photos[0];
+    const last = photos.length > 1 ? photos[photos.length - 1] : null;
+    compareEl.innerHTML = `<div class="evo-compare">
+        <div class="evo-compare-item">
+            <div class="evo-compare-label">Antes</div>
+            <img src="${first.url}" alt="Antes" onclick="openPhotoViewerFor('${escapeAttr(code)}','${first.id}')">
+            <div class="evo-compare-date">${new Date(first.date).toLocaleDateString('pt-BR')}</div>
+        </div>
+        <div class="evo-compare-arrow"><i class="fas fa-arrow-right"></i></div>
+        <div class="evo-compare-item">
+            <div class="evo-compare-label">${last ? 'Agora' : 'Única foto'}</div>
+            <img src="${(last || first).url}" alt="Agora" onclick="openPhotoViewerFor('${escapeAttr(code)}','${(last || first).id}')">
+            <div class="evo-compare-date">${new Date((last || first).date).toLocaleDateString('pt-BR')}</div>
+        </div>
+    </div>`;
+
+    gridEl.innerHTML = `<div class="evo-grid">${photos.slice().reverse().map(p => `
+        <div class="evo-thumb">
+            <img src="${p.url}" alt="Foto" onclick="openPhotoViewerFor('${escapeAttr(code)}','${p.id}')">
+            <button class="evo-thumb-del" onclick="event.stopPropagation();deleteEvolutionPhotoAsProfessor('${escapeAttr(code)}','${p.id}')" title="Excluir foto"><i class="fas fa-trash"></i></button>
+            <div class="evo-thumb-date">${new Date(p.date).toLocaleDateString('pt-BR')}</div>
+        </div>`).join('')}</div>`;
+}
+
+function deleteEvolutionPhotoAsProfessor(code, photoId) {
+    showConfirm('Excluir foto', 'Tem certeza que deseja excluir esta foto do aluno? Essa ação não pode ser desfeita.', () => {
+        STATE.studentPhotos[code] = (STATE.studentPhotos[code] || []).filter(p => p.id !== photoId);
+        saveToDB('studentPhotos', STATE.studentPhotos);
+        cloudDeletePhoto(code, photoId);
+        renderEvolutionDetail();
+        renderEvolutionGalleryGrid();
+        showToast('Foto excluída.', 'success');
+    });
+}
+
 function exportAttendanceCSV() {
     const rows = [['Aluno','Treino','Check-in','Conclusão','Progresso','Energia','Sono','Dor','Esforço','Feedback']];
     STATE.studentSessions.forEach(s => rows.push([
@@ -6483,6 +6988,7 @@ function importStudentPlanFromUrl() {
                         showToast('Não foi possível sincronizar sua ficha agora. Puxe a tela para atualizar ou reabra o link.', 'error');
                     }
                     startStudentSessionSync(activeCode);
+                    startStudentPhotoSync(activeCode);
                 }
                 renderStudentDashboard();
             }, 150);
