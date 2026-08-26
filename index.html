@@ -1405,9 +1405,28 @@
         .student-exercise-note i { color: var(--warning); font-size: 0.75rem; margin-top: 2px; flex: 0 0 auto; }
         .student-set-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
             gap: 6px;
         }
+        .ex-volume-readout {
+            margin-top: 8px;
+            padding: 7px 10px;
+            border-radius: 8px;
+            background: var(--primary-dim);
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .ex-volume-readout i { color: var(--primary); font-size: 0.72rem; }
+        .ex-volume-readout strong { color: var(--text-main); font-family: 'Rajdhani', sans-serif; font-weight: 700; }
+        .ex-volume-readout.is-empty {
+            background: transparent;
+            border: 1px dashed var(--border);
+            color: var(--text-dim);
+        }
+        .ex-volume-readout.is-empty i { color: var(--text-dim); }
         .set-toggle {
             min-height: 34px;
             border: 1px solid var(--border);
@@ -1645,6 +1664,12 @@
             display: flex;
             align-items: center;
             gap: 6px;
+        }
+        .volume-hint {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            margin: -4px 0 10px;
+            line-height: 1.4;
         }
         .load-progression-list { display: flex; flex-direction: column; gap: 10px; }
         .load-card {
@@ -5751,6 +5776,7 @@ function renderProfessorAppPanel() {
     if(loadBox) {
         loadBox.innerHTML = plan
             ? `<div class="load-section-title"><i class="fas fa-dumbbell"></i> Progressão por Exercício</div>
+               <div class="volume-hint">Volume = carga × repetições em cada série. Sobe tanto com mais peso quanto com mais repetições.</div>
                ${renderLoadProgressionList(plan, buildStudentLoadSeries, 'Ainda não há cargas registradas pelo aluno.')}
                <div class="load-section-title" style="margin-top:16px;"><i class="fas fa-layer-group"></i> Progressão por Grupo Muscular</div>
                ${renderLoadProgressionList(plan, buildStudentGroupLoadSeries, 'Ainda não há cargas registradas por grupo muscular.', 'bar')}
@@ -6053,6 +6079,14 @@ function toggleStudentSet(exIndex, setIndex) {
             session.setLoads[key] = val;
         }
     }
+    const repsInput = document.getElementById(`set-reps-${exIndex}-${setIndex}`);
+    if(repsInput && repsInput.value !== '') {
+        const reps = parseFloat(String(repsInput.value).replace(',', '.'));
+        if(Number.isFinite(reps) && reps > 0) {
+            session.setReps = session.setReps || {};
+            session.setReps[key] = reps;
+        }
+    }
     saveToDB('studentSessions', STATE.studentSessions);
     cloudSaveSession(session);
     renderStudentDashboard();
@@ -6075,6 +6109,29 @@ function saveStudentSetLoad(exIndex, setIndex, rawValue) {
     saveToDB('studentSessions', STATE.studentSessions);
     clearTimeout(_setLoadSyncTimers[session.id]);
     _setLoadSyncTimers[session.id] = setTimeout(() => cloudSaveSession(session), 500);
+    updateExerciseVolumeBadge(exIndex);
+    updateSessionVolumeTotal();
+}
+
+/* Repetições por série: junto com a carga, é o que forma o VOLUME de treino
+   (carga x repetições). Se o aluno aumentar as repetições mantendo a mesma
+   carga, o volume sobe mesmo sem bater recorde de carga máxima. */
+const _setRepsSyncTimers = {};
+function saveStudentSetReps(exIndex, setIndex, rawValue) {
+    const plan = findStudentPlanByCode(STATE.studentApp.activeCode);
+    if(!plan) return;
+    const session = getStudentSessionById(STATE.studentApp.sessionId) || startStudentAttendance(true);
+    if(!session) return;
+    const key = `${STATE.studentApp.workoutId}:${exIndex}:${setIndex}`;
+    session.setReps = session.setReps || {};
+    const val = parseFloat(String(rawValue ?? '').replace(',', '.'));
+    if(Number.isFinite(val) && val > 0) session.setReps[key] = val;
+    else delete session.setReps[key];
+    saveToDB('studentSessions', STATE.studentSessions);
+    clearTimeout(_setRepsSyncTimers[session.id]);
+    _setRepsSyncTimers[session.id] = setTimeout(() => cloudSaveSession(session), 500);
+    updateExerciseVolumeBadge(exIndex);
+    updateSessionVolumeTotal();
 }
 
 /* Maior carga registrada num exercício, dentro de uma sessão (entre todas as séries).
@@ -6097,21 +6154,99 @@ function getSessionExerciseMaxLoad(session, workoutId, exIndex) {
     return max;
 }
 
-function saveStudentPerformance(exIndex) {
+/* Melhor série de um exercício numa sessão, pelo 1RM ESTIMADO (fórmula de
+   Epley: e1RM = carga x (1 + reps/30)). Isso deixa o recorde justo entre
+   séries com números de repetição diferentes: 20kg x 15 reps (e1RM ~30kg)
+   representa mais força que 22kg x 3 reps (e1RM ~24.2kg), mesmo a carga
+   bruta sendo menor. Sem reps registradas, cai para a carga bruta (e1RM = carga). */
+function getSessionExerciseBestSet(session, workoutId, exIndex) {
+    if(!session) return null;
+    const prefix = `${workoutId}:${exIndex}:`;
+    const loads = session.setLoads || {};
+    const repsMap = session.setReps || {};
+    let best = null;
+    Object.keys(loads).forEach(key => {
+        if(!key.startsWith(prefix)) return;
+        const load = parseFloat(loads[key]);
+        if(!Number.isFinite(load) || load <= 0) return;
+        const repsRaw = parseFloat(repsMap[key]);
+        const reps = Number.isFinite(repsRaw) && repsRaw > 0 ? repsRaw : null;
+        const e1rm = reps ? load * (1 + reps / 30) : load;
+        if(!best || e1rm > best.e1rm) best = { load, reps, e1rm };
+    });
+    if(best) return best;
+    // Sessões antigas sem série detalhada: cai para a carga máxima simples.
+    const maxLoad = getSessionExerciseMaxLoad(session, workoutId, exIndex);
+    return maxLoad != null ? { load: maxLoad, reps: null, e1rm: maxLoad } : null;
+}
+
+/* Volume de treino de um exercício numa sessão: soma de (carga x repetições)
+   de cada série com os dois valores preenchidos. É esse número que alimenta
+   os gráficos de progressão — assim, aumentar repetições também conta como
+   evolução, não só aumentar a carga. */
+function getSessionExerciseVolume(session, workoutId, exIndex) {
+    if(!session) return null;
+    const prefix = `${workoutId}:${exIndex}:`;
+    const loads = session.setLoads || {};
+    const repsMap = session.setReps || {};
+    const perf = session.performance?.[`${workoutId}:${exIndex}`];
+    const fallbackRepsMatch = String(perf?.reps || '').match(/\d+([.,]\d+)?/);
+    const fallbackReps = fallbackRepsMatch ? parseFloat(fallbackRepsMatch[0].replace(',', '.')) : null;
+
+    let total = 0;
+    let hasSetData = false;
+    Object.keys(loads).forEach(key => {
+        if(!key.startsWith(prefix)) return;
+        const load = parseFloat(loads[key]);
+        if(!Number.isFinite(load) || load <= 0) return;
+        let reps = parseFloat(repsMap[key]);
+        if(!Number.isFinite(reps) || reps <= 0) reps = fallbackReps;
+        if(Number.isFinite(reps) && reps > 0) {
+            total += load * reps;
+            hasSetData = true;
+        }
+    });
+    if(hasSetData) return total;
+
+    // Sessões antigas (antes de haver repetições por série) ou sem reps
+    // informadas: usa a maior carga x repetições do campo de texto, se houver.
+    const maxLoad = getSessionExerciseMaxLoad(session, workoutId, exIndex);
+    if(maxLoad == null) return null;
+    return Number.isFinite(fallbackReps) && fallbackReps > 0 ? maxLoad * fallbackReps : maxLoad;
+}
+
+// Conteúdo do indicador de volume: enquanto o aluno não registrou nenhuma
+// série ainda, mostra um texto neutro em vez de "Volume: 0".
+function buildVolumeReadoutContent(volume, label = 'Volume desta sessão') {
+    if(!volume) {
+        return '<i class="fas fa-chart-simple"></i> Ainda sem carga registrada nesta sessão';
+    }
+    return `<i class="fas fa-chart-simple"></i> ${label}: <strong>${formatVolume(volume)}</strong>`;
+}
+
+// Atualiza só o número de volume do exercício (sem re-renderizar o card
+// inteiro, pra não perder o foco/teclado enquanto o aluno digita).
+function updateExerciseVolumeBadge(exIndex) {
+    const el = document.getElementById(`ex-volume-${exIndex}`);
+    if(!el) return;
+    const session = getStudentSessionById(STATE.studentApp.sessionId);
+    const volume = getSessionExerciseVolume(session, STATE.studentApp.workoutId, exIndex) || 0;
+    el.classList.toggle('is-empty', !volume);
+    el.innerHTML = buildVolumeReadoutContent(volume);
+}
+
+// Soma o volume de todos os exercícios do treino atual (mesma lógica do
+// badge por exercício, só que somando tudo).
+function updateSessionVolumeTotal() {
     const plan = findStudentPlanByCode(STATE.studentApp.activeCode);
-    if(!plan) return;
-    const session = getStudentSessionById(STATE.studentApp.sessionId) || startStudentAttendance(true);
-    if(!session) return;
-    const key = `${STATE.studentApp.workoutId}:${exIndex}`;
-    session.performance = session.performance || {};
-    session.performance[key] = {
-        carga: document.getElementById(`student-perf-carga-${exIndex}`)?.value.trim() || '',
-        reps: document.getElementById(`student-perf-reps-${exIndex}`)?.value.trim() || '',
-        updatedAt: new Date().toISOString()
-    };
-    saveToDB('studentSessions', STATE.studentSessions);
-    cloudSaveSession(session);
-    renderAttendancePanel();
+    const el = document.getElementById('session-volume-total');
+    if(!plan || !el) return;
+    const workoutId = STATE.studentApp.workoutId;
+    const exercises = plan.treinos[workoutId] || [];
+    const session = getStudentSessionById(STATE.studentApp.sessionId);
+    const total = exercises.reduce((sum, ex, i) => sum + (getSessionExerciseVolume(session, workoutId, i) || 0), 0);
+    el.classList.toggle('is-empty', !total);
+    el.innerHTML = buildVolumeReadoutContent(total, 'Volume total desta sessão');
 }
 
 /* Compara a maior carga de cada exercício desta sessão com a maior carga
@@ -6129,15 +6264,23 @@ function checkStudentWorkoutRecords(plan, session) {
     );
     const records = [];
     exercises.forEach((ex, exIndex) => {
-        const currentMax = getSessionExerciseMaxLoad(session, workoutId, exIndex);
-        if(currentMax == null) return;
-        let prevMax = null;
+        const current = getSessionExerciseBestSet(session, workoutId, exIndex);
+        if(current == null) return;
+        let prevBest = null;
         priorSessions.forEach(ps => {
-            const pMax = getSessionExerciseMaxLoad(ps, workoutId, exIndex);
-            if(pMax != null && (prevMax == null || pMax > prevMax)) prevMax = pMax;
+            const p = getSessionExerciseBestSet(ps, workoutId, exIndex);
+            if(p != null && (prevBest == null || p.e1rm > prevBest.e1rm)) prevBest = p;
         });
-        if(prevMax != null && currentMax > prevMax) {
-            records.push({ name: ex.nome, load: currentMax, prev: prevMax });
+        if(prevBest != null && current.e1rm > prevBest.e1rm) {
+            records.push({
+                name: ex.nome,
+                load: current.load,
+                reps: current.reps,
+                e1rm: roundVolume(current.e1rm),
+                prev: prevBest.load,
+                prevReps: prevBest.reps,
+                prevE1rm: roundVolume(prevBest.e1rm)
+            });
         }
     });
     return records;
@@ -6158,11 +6301,11 @@ function showRecordCelebration(records) {
     wrap.innerHTML = `
         <div class="record-card">
             <div class="record-star"><i class="fas fa-star"></i></div>
-            <div class="record-title">Recorde de carga!</div>
+            <div class="record-title">Recorde de força!</div>
             <div class="record-list">
                 ${records.map(r => `<div class="record-item">
-                    <strong>${escapeHtml(r.name)}</strong>: ${formatVolume(r.load)}kg
-                    <span class="record-prev">Anterior: ${formatVolume(r.prev)}kg</span>
+                    <strong>${escapeHtml(r.name)}</strong>: ${formatVolume(r.load)}kg${r.reps ? ` × ${formatVolume(r.reps)}` : ''}
+                    <span class="record-prev">Anterior: ${formatVolume(r.prev)}kg${r.prevReps ? ` × ${formatVolume(r.prevReps)}` : ''} · 1RM est. +${formatVolume(roundVolume(r.e1rm - r.prevE1rm))}kg</span>
                 </div>`).join('')}
             </div>
             <button class="record-close-btn" onclick="closeRecordCelebration()">Mandou bem!</button>
@@ -6215,15 +6358,15 @@ function buildStudentLoadSeriesBy(plan, keyFn) {
         const exs = plan.treinos[s.workoutId] || [];
         const bucket = {};
         exs.forEach((ex, idx) => {
-            const load = getSessionExerciseMaxLoad(s, s.workoutId, idx);
-            if(load == null) return;
+            const volume = getSessionExerciseVolume(s, s.workoutId, idx);
+            if(volume == null || volume <= 0) return;
             const k = keyFn(ex);
             if(!k) return;
-            if(bucket[k] == null || load > bucket[k]) bucket[k] = load;
+            bucket[k] = (bucket[k] || 0) + volume;
         });
-        Object.entries(bucket).forEach(([k, load]) => {
+        Object.entries(bucket).forEach(([k, volume]) => {
             if(!series[k]) series[k] = [];
-            series[k].push({ date: s.checkInAt, load });
+            series[k].push({ date: s.checkInAt, load: roundVolume(volume) });
         });
     });
     return series;
@@ -6300,7 +6443,11 @@ function buildStudentRecordHistory(plan) {
         .sort((a, b) => String(b.finishedAt).localeCompare(String(a.finishedAt)));
     const out = [];
     sessions.forEach(s => {
-        s.records.forEach(r => out.push({ name: r.name, load: r.load, prev: r.prev, date: s.finishedAt, workoutId: s.workoutId }));
+        s.records.forEach(r => out.push({
+            name: r.name, load: r.load, reps: r.reps, e1rm: r.e1rm,
+            prev: r.prev, prevReps: r.prevReps, prevE1rm: r.prevE1rm,
+            date: s.finishedAt, workoutId: s.workoutId
+        }));
     });
     return out;
 }
@@ -6312,21 +6459,25 @@ function renderRecordHistoryList(plan) {
     }
     return `<div class="load-progression-list">${records.map(r => {
         const date = new Date(r.date).toLocaleDateString('pt-BR');
-        const hasPrev = r.prev != null && r.prev > 0;
-        const gain = hasPrev ? roundVolume(r.load - r.prev) : null;
-        const gainPct = hasPrev ? Math.round((gain / r.prev) * 100) : null;
+        // Compatibilidade com recordes antigos (antes do 1RM estimado), que só têm carga bruta.
+        const currentE1rm = r.e1rm != null ? r.e1rm : r.load;
+        const prevE1rm = r.prevE1rm != null ? r.prevE1rm : r.prev;
+        const hasPrev = prevE1rm != null && prevE1rm > 0;
+        const gain = hasPrev ? roundVolume(currentE1rm - prevE1rm) : null;
+        const gainPct = (gain != null && prevE1rm) ? Math.round((gain / prevE1rm) * 100) : null;
         const isRecent = daysSince(r.date) <= 7;
+        const setLabel = r.reps ? `${formatVolume(r.load)}kg × ${formatVolume(r.reps)}` : `${formatVolume(r.load)}kg`;
         return `<div class="record-card${isRecent ? ' is-recent' : ''}">
             <div class="record-trophy"><i class="fas fa-trophy"></i></div>
             <div class="record-body">
                 <div class="load-card-head" style="margin-bottom:2px;">
                     <strong>${escapeHtml(r.name)}</strong>
-                    <span class="record-load">${formatVolume(r.load)}<small>KG</small></span>
+                    <span class="record-load">${setLabel}</span>
                 </div>
                 <div class="load-card-foot">
                     <span>Treino ${escapeHtml(r.workoutId)} · ${date}${isRecent ? ' · <span class="record-new-tag">novo</span>' : ''}</span>
-                    ${hasPrev
-                        ? `<span class="record-gain"><i class="fas fa-arrow-trend-up"></i> +${formatVolume(gain)}kg${gainPct != null ? ` (+${gainPct}%)` : ''}</span>`
+                    ${gain != null
+                        ? `<span class="record-gain"><i class="fas fa-arrow-trend-up"></i> +${formatVolume(gain)} 1RM est. ${gainPct != null ? `(+${gainPct}%)` : ''}</span>`
                         : `<span>Primeiro registro</span>`}
                 </div>
             </div>
@@ -6352,7 +6503,7 @@ function renderLoadProgressionList(plan, seriesFn = buildStudentLoadSeries, empt
         const trendClass = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
         const trendIcon = delta > 0 ? 'fa-arrow-trend-up' : delta < 0 ? 'fa-arrow-trend-down' : 'fa-minus';
         const lastDate = new Date(points[points.length - 1].date).toLocaleDateString('pt-BR');
-        const trendText = delta === 0 ? 'estável' : `${delta > 0 ? '+' : ''}${formatVolume(delta)}kg (${deltaPct > 0 ? '+' : ''}${deltaPct}%)`;
+        const trendText = delta === 0 ? 'estável' : `${delta > 0 ? '+' : ''}${formatVolume(delta)} vol. (${deltaPct > 0 ? '+' : ''}${deltaPct}%)`;
         return `<div class="load-card">
             <div class="load-icon ${trendClass}"><i class="fas ${sectionIcon}"></i></div>
             <div class="load-body">
@@ -6363,7 +6514,7 @@ function renderLoadProgressionList(plan, seriesFn = buildStudentLoadSeries, empt
                 ${chartType === 'bar' ? renderLoadBarChartSVG(points) : renderLoadSparklineSVG(points)}
                 <div class="load-card-foot">
                     <span>${points.length} registro(s)</span>
-                    <span><i class="fas fa-trophy" style="color:var(--warning);"></i> pico ${formatVolume(maxLoad)}kg · última ${formatVolume(last)}kg em ${lastDate}</span>
+                    <span><i class="fas fa-trophy" style="color:var(--warning);"></i> pico ${formatVolume(maxLoad)} vol. · última ${formatVolume(last)} vol. em ${lastDate}</span>
                 </div>
             </div>
         </div>`;
@@ -6638,6 +6789,7 @@ function renderStudentDashboard() {
             </div>
             ${viewTabs}
             <div class="load-section-title"><i class="fas fa-dumbbell"></i> Progressão por Exercício</div>
+            <div class="volume-hint">Volume = carga × repetições em cada série. Sobe tanto com mais peso quanto com mais repetições.</div>
             ${renderLoadProgressionList(plan, buildStudentLoadSeries, 'Você ainda não registrou cargas.')}
             <div class="load-section-title" style="margin-top:16px;"><i class="fas fa-layer-group"></i> Progressão por Grupo Muscular</div>
             ${renderLoadProgressionList(plan, buildStudentGroupLoadSeries, 'Você ainda não registrou cargas por grupo muscular.', 'bar')}
@@ -6659,16 +6811,19 @@ function renderStudentDashboard() {
     }
 
     const tabs = activeIds.map(id => `<button class="${id === workoutId ? 'active' : ''}" onclick="setStudentWorkout('${id}')">Treino ${id}</button>`).join('');
+    const totalSessionVolume = exercises.reduce((sum, ex, i) => sum + (getSessionExerciseVolume(session, workoutId, i) || 0), 0);
     const exerciseRows = exercises.length ? exercises.map((ex, i) => {
         const sets = parseInt(ex.series) || 0;
-        const perf = session?.performance?.[`${workoutId}:${i}`] || {};
+        const exVolume = getSessionExerciseVolume(session, workoutId, i) || 0;
         const setButtons = Array.from({ length: sets }, (_, idx) => {
             const key = `${workoutId}:${i}:${idx}`;
             const done = !!session?.completed?.[key];
             const setLoad = session?.setLoads?.[key];
+            const setReps = session?.setReps?.[key];
             return `<div class="set-item">
                 <button class="set-toggle ${done ? 'done' : ''}" onclick="toggleStudentSet(${i},${idx})">${idx + 1}</button>
                 <input id="set-load-${i}-${idx}" class="set-load-input" type="number" step="0.5" min="0" placeholder="kg" value="${setLoad != null ? escapeAttr(String(setLoad)) : ''}" onclick="event.stopPropagation()" oninput="saveStudentSetLoad(${i},${idx},this.value)" onchange="saveStudentSetLoad(${i},${idx},this.value)">
+                <input id="set-reps-${i}-${idx}" class="set-load-input" type="number" step="1" min="0" placeholder="reps" value="${setReps != null ? escapeAttr(String(setReps)) : ''}" onclick="event.stopPropagation()" oninput="saveStudentSetReps(${i},${idx},this.value)" onchange="saveStudentSetReps(${i},${idx},this.value)">
             </div>`;
         }).join('');
         const media = getExerciseMedia(ex.grupo, ex.nome);
@@ -6694,12 +6849,9 @@ function renderStudentDashboard() {
                 </div>
             </div>
             ${ex.obs ? `<div class="student-exercise-note"><i class="fas fa-comment-dots"></i><span>${escapeHtml(ex.obs)}</span></div>` : ''}
-            <div class="grid-2" style="gap:8px;">
-                <input id="student-perf-carga-${i}" type="text" value="${escapeAttr(perf.carga || '')}" placeholder="Carga feita" onchange="saveStudentPerformance(${i})" style="margin-bottom:0;">
-                <input id="student-perf-reps-${i}" type="text" value="${escapeAttr(perf.reps || '')}" placeholder="Reps reais" onchange="saveStudentPerformance(${i})" style="margin-bottom:0;">
-            </div>
-            <div class="student-mini-text" style="margin-bottom:4px;">Marque a série e anote a carga usada em cada uma:</div>
+            <div class="student-mini-text" style="margin-bottom:4px;">Marque a série e anote a carga e as repetições de cada uma:</div>
             <div class="student-set-grid">${setButtons}</div>
+            <div class="ex-volume-readout${exVolume ? '' : ' is-empty'}" id="ex-volume-${i}">${buildVolumeReadoutContent(exVolume)}</div>
             ${media.videoUrl ? `<button class="btn btn-ghost btn-small" style="color:var(--accent);border-color:var(--accent-dim);" onclick="openExerciseViewer(decodeURIComponent('${encodeURIComponent(ex.grupo)}'),decodeURIComponent('${encodeURIComponent(ex.nome)}'))"><i class="fas fa-play"></i> Ver vídeo</button>` : ''}
         </div>`;
     }).join('') : '<div class="empty-state"><i class="fas fa-dumbbell"></i><p>Nenhum exercício neste treino ainda.</p><span class="empty-state-hint">Peça ao seu professor para liberar os exercícios por aqui.</span></div>';
@@ -6710,6 +6862,7 @@ function renderStudentDashboard() {
             <p>${escapeHtml(sourceLabel)} - atualização ${updated}</p>
             <div class="timer-progress" style="margin:10px 0 0;"><div class="timer-progress-fill" style="width:${progress.percent}%;"></div></div>
             <div class="student-mini-text" style="margin-top:6px;">${progress.done}/${progress.total} séries - ${progress.percent}%</div>
+            <div class="ex-volume-readout${totalSessionVolume ? '' : ' is-empty'}" id="session-volume-total" style="margin-top:8px;">${buildVolumeReadoutContent(totalSessionVolume, 'Volume total desta sessão')}</div>
         </div>
         ${viewTabs}
         ${renderStudentCheckinPanel(session)}
