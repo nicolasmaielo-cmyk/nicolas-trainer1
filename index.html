@@ -6925,7 +6925,7 @@ function renderStudentFeedbackView(plan, currentSession) {
             <div class="student-mini-text" style="margin-bottom:8px;"><i class="fas fa-message"></i> Feedback do treino ${escapeHtml(STATE.studentApp.workoutId)} de hoje</div>
             <label>Esforço percebido</label>
             <select id="student-feedback-rpe" onchange="saveStudentFeedback()">
-                ${['', 'Leve', 'Moderado', 'Pesado', 'Muito pesado'].map(v => `<option ${f.rpe === v ? 'selected' : ''}>${v || 'Selecione'}</option>`).join('')}
+                ${['', 'Leve', 'Moderado', 'Pesado', 'Muito pesado'].map(v => `<option value="${v}" ${f.rpe === v ? 'selected' : ''}>${v || 'Selecione'}</option>`).join('')}
             </select>
             <label>Notas para o professor</label>
             <textarea id="student-feedback-notes" rows="3" placeholder="Ex: senti o ombro no supino, aumentei carga no leg press..." onchange="saveStudentFeedback()">${escapeHtml(f.notes || '')}</textarea>
