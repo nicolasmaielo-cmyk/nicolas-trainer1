@@ -1654,11 +1654,16 @@
 
         /* Student view tabs (Treino / Carga / Frequência) */
         .student-view-tabs {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            display: flex;
             gap: 6px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 2px;
+            scrollbar-width: none;
         }
+        .student-view-tabs::-webkit-scrollbar { display: none; }
         .student-view-tabs button {
+            flex: 0 0 auto;
             min-height: 36px;
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -1672,12 +1677,49 @@
             align-items: center;
             justify-content: center;
             gap: 5px;
-            padding: 0 4px;
+            padding: 0 12px;
+            white-space: nowrap;
         }
         .student-view-tabs button.active {
             background: var(--primary-dim);
             border-color: var(--primary);
             color: var(--primary);
+        }
+        .feedback-history-list { display: flex; flex-direction: column; gap: 8px; }
+        .feedback-item {
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-input);
+            padding: 10px 12px;
+        }
+        .feedback-item.is-recent {
+            border-color: rgba(0,212,170,0.35);
+            background: linear-gradient(135deg, rgba(0,212,170,0.08), var(--bg-input) 65%);
+        }
+        .feedback-item-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.78rem;
+        }
+        .feedback-item-head span { color: var(--text-dim); font-size: 0.7rem; }
+        .feedback-rpe-tag {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: var(--primary-dim);
+            color: var(--primary);
+            font-size: 0.66rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .feedback-item p {
+            margin: 6px 0 0;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.45;
         }
 
         /* Load progression cards */
@@ -2152,6 +2194,7 @@
     <button onclick="showTab('tab-media', this)"><i class="fas fa-photo-video"></i> Mídia</button>
     <button onclick="showTab('tab-app', this)"><i class="fas fa-mobile-screen-button"></i> App Aluno</button>
     <button onclick="showTab('tab-evolucao', this)"><i class="fas fa-camera-retro"></i> Evolução</button>
+    <button onclick="showTab('tab-feedback', this)"><i class="fas fa-message"></i> Feedback</button>
     <button onclick="showTab('tab-config', this)"><i class="fas fa-cog"></i> Config</button>
 </nav>
 
@@ -2512,6 +2555,17 @@
         <div id="evolucao-detail-compare"></div>
         <div class="load-section-title" style="margin-top:16px; margin-bottom:6px;"><i class="fas fa-images"></i> Linha do tempo</div>
         <div id="evolucao-detail-grid"></div>
+    </div>
+</div>
+
+<!-- ===================== TAB: FEEDBACK (comentários dos alunos, todos juntos) ===================== -->
+<div id="tab-feedback" class="container">
+    <div class="card trainer-only">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+            <h2 class="section-title" style="margin:0; border:none; padding:0;"><i class="fas fa-message"></i> Feedback dos Alunos</h2>
+        </div>
+        <input type="text" id="feedback-search" placeholder="Buscar aluno..." oninput="renderFeedbackFeed()" style="margin-bottom:14px;">
+        <div id="feedback-feed"></div>
     </div>
 </div>
 
@@ -3642,6 +3696,7 @@ function showTab(tabId, btn) {
     if(tabId === 'tab-media') { populateMediaGrupoSelect(); renderMediaLibrary(); }
     if(tabId === 'tab-app') { renderStudentAppAll(); }
     if(tabId === 'tab-evolucao') { renderEvolutionGallery(); }
+    if(tabId === 'tab-feedback') { renderFeedbackFeed(); }
 }
 
 // Abrir análise a partir da ficha — salva contexto completo
@@ -6410,10 +6465,6 @@ function finishStudentWorkout() {
     session.finishedAt = new Date().toISOString();
     session.progress = progress.percent;
     session.records = records;
-    session.feedback = {
-        rpe: document.getElementById('student-feedback-rpe')?.value || '',
-        notes: document.getElementById('student-feedback-notes')?.value.trim() || ''
-    };
     saveToDB('studentSessions', STATE.studentSessions);
     cloudSaveSession(session);
     showToast('Treino concluído.', 'success');
@@ -6846,17 +6897,57 @@ function renderStudentCheckinPanel(session) {
     </div>`;
 }
 
-function renderStudentFeedbackPanel(session) {
+function renderStudentFeedbackView(plan, currentSession) {
+    const session = currentSession || getOpenSessionForStudent(plan, STATE.studentApp.workoutId);
     const f = session?.feedback || {};
-    return `<div class="student-feedback-panel">
-        <div class="student-mini-text" style="margin-bottom:8px;"><i class="fas fa-message"></i> Feedback pós-treino</div>
-        <label>Esforço percebido</label>
-        <select id="student-feedback-rpe">
-            ${['','Leve','Moderado','Pesado','Muito pesado'].map(v => `<option ${f.rpe === v ? 'selected' : ''}>${v || 'Selecione'}</option>`).join('')}
-        </select>
-        <label>Notas para o professor</label>
-        <textarea id="student-feedback-notes" rows="2" placeholder="Ex: senti o ombro no supino, aumentei carga no leg press...">${escapeHtml(f.notes || '')}</textarea>
-    </div>`;
+
+    const history = STATE.studentSessions
+        .filter(s => s.code === plan.code && (s.feedback?.notes || s.feedback?.rpe) && s.id !== session?.id)
+        .slice()
+        .sort((a, b) => String(b.checkInAt).localeCompare(String(a.checkInAt)));
+
+    const historyHtml = history.length
+        ? `<div class="feedback-history-list">${history.map(s => {
+            const date = new Date(s.checkInAt).toLocaleDateString('pt-BR');
+            return `<div class="feedback-item">
+                <div class="feedback-item-head">
+                    <strong>Treino ${escapeHtml(s.workoutId)}</strong>
+                    <span>${date}</span>
+                </div>
+                ${s.feedback?.rpe ? `<span class="feedback-rpe-tag">${escapeHtml(s.feedback.rpe)}</span>` : ''}
+                ${s.feedback?.notes ? `<p>${escapeHtml(s.feedback.notes)}</p>` : ''}
+            </div>`;
+        }).join('')}</div>`
+        : '<div class="empty-state" style="padding:18px;"><i class="fas fa-message"></i><p>Você ainda não enviou feedback antes.</p><span class="empty-state-hint">O que você escrever aqui vai direto pro seu professor.</span></div>';
+
+    return `
+        <div class="student-feedback-panel">
+            <div class="student-mini-text" style="margin-bottom:8px;"><i class="fas fa-message"></i> Feedback do treino ${escapeHtml(STATE.studentApp.workoutId)} de hoje</div>
+            <label>Esforço percebido</label>
+            <select id="student-feedback-rpe" onchange="saveStudentFeedback()">
+                ${['', 'Leve', 'Moderado', 'Pesado', 'Muito pesado'].map(v => `<option ${f.rpe === v ? 'selected' : ''}>${v || 'Selecione'}</option>`).join('')}
+            </select>
+            <label>Notas para o professor</label>
+            <textarea id="student-feedback-notes" rows="3" placeholder="Ex: senti o ombro no supino, aumentei carga no leg press..." onchange="saveStudentFeedback()">${escapeHtml(f.notes || '')}</textarea>
+        </div>
+        <div class="load-section-title" style="margin-top:16px; margin-bottom:6px;"><i class="fas fa-clock-rotate-left"></i> Seus feedbacks anteriores</div>
+        ${historyHtml}
+    `;
+}
+
+function saveStudentFeedback() {
+    const plan = findStudentPlanByCode(STATE.studentApp.activeCode);
+    if(!plan) return;
+    const session = getStudentSessionById(STATE.studentApp.sessionId) || getOrCreateStudentSession();
+    if(!session) return;
+    session.feedback = {
+        rpe: document.getElementById('student-feedback-rpe')?.value || '',
+        notes: document.getElementById('student-feedback-notes')?.value.trim() || ''
+    };
+    saveToDB('studentSessions', STATE.studentSessions);
+    cloudSaveSession(session);
+    showToast('Feedback enviado ao professor!', 'success');
+    renderAttendancePanel();
 }
 
 function renderStudentProgressHistory(plan) {
@@ -6920,8 +7011,20 @@ function renderStudentDashboard() {
         <button class="${view === 'carga' ? 'active' : ''}" onclick="setStudentView('carga')"><i class="fas fa-chart-line"></i> Carga</button>
         <button class="${view === 'frequencia' ? 'active' : ''}" onclick="setStudentView('frequencia')"><i class="fas fa-calendar-check"></i> Frequência</button>
         <button class="${view === 'evolucao' ? 'active' : ''}" onclick="setStudentView('evolucao')"><i class="fas fa-camera-retro"></i> Evolução</button>
+        <button class="${view === 'feedback' ? 'active' : ''}" onclick="setStudentView('feedback')"><i class="fas fa-message"></i> Feedback</button>
     </div>`;
 
+    if(view === 'feedback') {
+        dash.innerHTML = `
+            <div class="student-hero">
+                <h3>${escapeHtml(plan.aluno)}</h3>
+                <p>${escapeHtml(sourceLabel)} - atualização ${updated}</p>
+            </div>
+            ${viewTabs}
+            ${renderStudentFeedbackView(plan, session)}
+        `;
+        return;
+    }
     if(view === 'evolucao') {
         dash.innerHTML = `
             <div class="student-hero">
@@ -7025,7 +7128,6 @@ function renderStudentDashboard() {
         </div>
         <div class="student-workout-tabs">${tabs}</div>
         <div class="student-dashboard">${exerciseRows}</div>
-        ${renderStudentFeedbackPanel(session)}
         ${renderStudentProgressHistory(plan)}
     `;
 }
@@ -7062,6 +7164,40 @@ function renderAttendancePanel() {
             <span class="attendance-pill">${status}</span>
         </div>`;
     }).join('');
+}
+
+/* ================================================================
+   FEED DE FEEDBACK (todos os alunos juntos) — visão do professor
+   ================================================================ */
+function renderFeedbackFeed() {
+    const container = document.getElementById('feedback-feed');
+    if(!container) return;
+    const q = (document.getElementById('feedback-search')?.value || '').toLowerCase();
+
+    const entries = STATE.studentSessions
+        .filter(s => (s.feedback?.notes || s.feedback?.rpe) && s.aluno.toLowerCase().includes(q))
+        .slice()
+        .sort((a, b) => String(b.checkInAt).localeCompare(String(a.checkInAt)));
+
+    if(!entries.length) {
+        container.innerHTML = STATE.studentSessions.some(s => s.feedback?.notes || s.feedback?.rpe)
+            ? '<div class="empty-state" style="padding:30px;"><i class="fas fa-message"></i><p>Nenhum feedback encontrado para essa busca.</p></div>'
+            : '<div class="empty-state" style="padding:30px;"><i class="fas fa-message"></i><p>Nenhum feedback recebido ainda.</p><span class="empty-state-hint">Assim que um aluno enviar um feedback, ele aparece aqui.</span></div>';
+        return;
+    }
+
+    container.innerHTML = `<div class="feedback-history-list">${entries.map(s => {
+        const date = new Date(s.checkInAt).toLocaleDateString('pt-BR');
+        const isRecent = daysSince(s.checkInAt) <= 3;
+        return `<div class="feedback-item${isRecent ? ' is-recent' : ''}">
+            <div class="feedback-item-head">
+                <strong>${escapeHtml(s.aluno)} <span style="color:var(--text-dim); font-weight:600;">· Treino ${escapeHtml(s.workoutId)}</span></strong>
+                <span>${date}</span>
+            </div>
+            ${s.feedback?.rpe ? `<span class="feedback-rpe-tag">${escapeHtml(s.feedback.rpe)}</span>` : ''}
+            ${s.feedback?.notes ? `<p>${escapeHtml(s.feedback.notes)}</p>` : '<p style="opacity:0.6;">Sem observações escritas.</p>'}
+        </div>`;
+    }).join('')}</div>`;
 }
 
 /* ================================================================
