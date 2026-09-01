@@ -1721,6 +1721,37 @@
             color: var(--text-muted);
             line-height: 1.45;
         }
+        .feedback-reply-box { margin-top: 8px; }
+        .feedback-reply-shown {
+            border-left: 2px solid var(--primary);
+            background: var(--primary-dim);
+            border-radius: 0 8px 8px 0;
+            padding: 8px 10px;
+        }
+        .feedback-reply-label {
+            display: block;
+            font-size: 0.64rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--primary);
+            margin-bottom: 3px;
+        }
+        .feedback-reply-shown p {
+            margin: 0;
+            font-size: 0.8rem;
+            color: var(--text-main);
+            line-height: 1.4;
+        }
+        .feedback-reply-shown .btn {
+            margin-top: 6px;
+        }
+        .feedback-reply-form {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .feedback-reply-form textarea { margin-bottom: 0; }
 
         /* Load progression cards */
         .load-section-title {
@@ -6900,6 +6931,9 @@ function renderStudentCheckinPanel(session) {
 function renderStudentFeedbackView(plan, currentSession) {
     const session = currentSession || getOpenSessionForStudent(plan, STATE.studentApp.workoutId);
     const f = session?.feedback || {};
+    const currentReply = f.professorReply?.text
+        ? `<div class="feedback-reply-shown"><span class="feedback-reply-label"><i class="fas fa-reply"></i> Resposta do professor</span><p>${escapeHtml(f.professorReply.text)}</p></div>`
+        : '';
 
     const history = STATE.studentSessions
         .filter(s => s.code === plan.code && (s.feedback?.notes || s.feedback?.rpe) && s.id !== session?.id)
@@ -6909,6 +6943,9 @@ function renderStudentFeedbackView(plan, currentSession) {
     const historyHtml = history.length
         ? `<div class="feedback-history-list">${history.map(s => {
             const date = new Date(s.checkInAt).toLocaleDateString('pt-BR');
+            const reply = s.feedback?.professorReply?.text
+                ? `<div class="feedback-reply-shown"><span class="feedback-reply-label"><i class="fas fa-reply"></i> Resposta do professor</span><p>${escapeHtml(s.feedback.professorReply.text)}</p></div>`
+                : '';
             return `<div class="feedback-item">
                 <div class="feedback-item-head">
                     <strong>Treino ${escapeHtml(s.workoutId)}</strong>
@@ -6916,6 +6953,7 @@ function renderStudentFeedbackView(plan, currentSession) {
                 </div>
                 ${s.feedback?.rpe ? `<span class="feedback-rpe-tag">${escapeHtml(s.feedback.rpe)}</span>` : ''}
                 ${s.feedback?.notes ? `<p>${escapeHtml(s.feedback.notes)}</p>` : ''}
+                ${reply}
             </div>`;
         }).join('')}</div>`
         : '<div class="empty-state" style="padding:18px;"><i class="fas fa-message"></i><p>Você ainda não enviou feedback antes.</p><span class="empty-state-hint">O que você escrever aqui vai direto pro seu professor.</span></div>';
@@ -6929,6 +6967,7 @@ function renderStudentFeedbackView(plan, currentSession) {
             </select>
             <label>Notas para o professor</label>
             <textarea id="student-feedback-notes" rows="3" placeholder="Ex: senti o ombro no supino, aumentei carga no leg press..." onchange="saveStudentFeedback()">${escapeHtml(f.notes || '')}</textarea>
+            ${currentReply}
         </div>
         <div class="load-section-title" style="margin-top:16px; margin-bottom:6px;"><i class="fas fa-clock-rotate-left"></i> Seus feedbacks anteriores</div>
         ${historyHtml}
@@ -6941,6 +6980,7 @@ function saveStudentFeedback() {
     const session = getStudentSessionById(STATE.studentApp.sessionId) || getOrCreateStudentSession();
     if(!session) return;
     session.feedback = {
+        ...(session.feedback || {}),
         rpe: document.getElementById('student-feedback-rpe')?.value || '',
         notes: document.getElementById('student-feedback-notes')?.value.trim() || ''
     };
@@ -7189,6 +7229,7 @@ function renderFeedbackFeed() {
     container.innerHTML = `<div class="feedback-history-list">${entries.map(s => {
         const date = new Date(s.checkInAt).toLocaleDateString('pt-BR');
         const isRecent = daysSince(s.checkInAt) <= 3;
+        const hasReply = !!s.feedback?.professorReply?.text;
         return `<div class="feedback-item${isRecent ? ' is-recent' : ''}">
             <div class="feedback-item-head">
                 <strong>${escapeHtml(s.aluno)} <span style="color:var(--text-dim); font-weight:600;">· Treino ${escapeHtml(s.workoutId)}</span></strong>
@@ -7196,8 +7237,38 @@ function renderFeedbackFeed() {
             </div>
             ${s.feedback?.rpe ? `<span class="feedback-rpe-tag">${escapeHtml(s.feedback.rpe)}</span>` : ''}
             ${s.feedback?.notes ? `<p>${escapeHtml(s.feedback.notes)}</p>` : '<p style="opacity:0.6;">Sem observações escritas.</p>'}
+            <div class="feedback-reply-box">
+                ${hasReply ? `<div class="feedback-reply-shown">
+                    <span class="feedback-reply-label"><i class="fas fa-reply"></i> Sua resposta</span>
+                    <p>${escapeHtml(s.feedback.professorReply.text)}</p>
+                    <button class="btn btn-ghost btn-small" onclick="toggleFeedbackReplyEdit('${s.id}')"><i class="fas fa-pen"></i> Editar</button>
+                </div>` : ''}
+                <div class="feedback-reply-form" id="feedback-reply-form-${s.id}" style="${hasReply ? 'display:none;' : ''}">
+                    <textarea id="feedback-reply-input-${s.id}" rows="2" placeholder="Responder ${escapeAttr(s.aluno)}...">${escapeHtml(s.feedback?.professorReply?.text || '')}</textarea>
+                    <button class="btn btn-small" onclick="saveFeedbackReply('${s.id}')"><i class="fas fa-paper-plane"></i> Enviar resposta</button>
+                </div>
+            </div>
         </div>`;
     }).join('')}</div>`;
+}
+
+function toggleFeedbackReplyEdit(sessionId) {
+    const form = document.getElementById(`feedback-reply-form-${sessionId}`);
+    if(form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function saveFeedbackReply(sessionId) {
+    const session = STATE.studentSessions.find(s => s.id === sessionId);
+    if(!session) return;
+    const input = document.getElementById(`feedback-reply-input-${sessionId}`);
+    const text = input?.value.trim() || '';
+    session.feedback = session.feedback || {};
+    if(text) session.feedback.professorReply = { text, date: new Date().toISOString() };
+    else delete session.feedback.professorReply;
+    saveToDB('studentSessions', STATE.studentSessions);
+    cloudSaveSession(session);
+    showToast(text ? 'Resposta enviada ao aluno!' : 'Resposta removida.', 'success');
+    renderFeedbackFeed();
 }
 
 /* ================================================================
