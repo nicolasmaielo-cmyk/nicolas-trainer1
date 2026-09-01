@@ -1830,38 +1830,79 @@
         .freq-bar-count { color: var(--text-muted); font-size: 0.66rem; font-weight: 700; min-height: 12px; }
         .freq-bar-label { color: var(--text-dim); font-size: 0.63rem; font-weight: 700; text-transform: uppercase; }
 
-        /* Heatmap de consistência (últimas semanas) */
-        .freq-heatmap-wrap {
-            display: flex;
-            gap: 5px;
+        /* Calendário mensal de treinos */
+        .freq-calendar {
             border: 1px solid var(--border);
             border-radius: var(--radius);
             background: var(--bg-input);
-            padding: 10px;
-            overflow-x: auto;
+            padding: 12px;
         }
-        .freq-hm-rowlabels { display: flex; flex-direction: column; gap: 3px; padding-top: 1px; flex: 0 0 auto; }
-        .freq-hm-rowlabel {
-            width: 13px; height: 13px;
-            font-size: 0.5rem;
-            color: var(--text-dim);
-            display: flex; align-items: center; justify-content: center;
+        .freq-cal-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
         }
-        .freq-heatmap { display: flex; gap: 3px; }
-        .freq-hm-col { display: flex; flex-direction: column; gap: 3px; }
-        .freq-hm-cell {
-            width: 13px; height: 13px;
-            border-radius: 3px;
-            background: var(--bg-card);
+        .freq-cal-nav strong {
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 0.92rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-main);
+        }
+        .freq-cal-nav button {
+            width: 30px; height: 30px;
+            border-radius: 8px;
             border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.78rem;
         }
-        .freq-hm-cell.on {
-            background: var(--accent);
-            border-color: var(--accent);
-            box-shadow: 0 0 6px rgba(0,212,170,0.5);
+        .freq-cal-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+        .freq-cal-nav button:not(:disabled):hover { border-color: var(--primary); color: var(--primary); }
+        .freq-cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
         }
-        .freq-hm-cell.future { opacity: 0.3; }
-        .freq-hm-cell.today { outline: 1.5px solid var(--primary); outline-offset: 1px; }
+        .freq-cal-head { margin-bottom: 4px; }
+        .freq-cal-headcell {
+            text-align: center;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+        .freq-cal-cell {
+            aspect-ratio: 1/1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            background: var(--bg-card);
+        }
+        .freq-cal-cell.empty { background: transparent; }
+        .freq-cal-cell.future { opacity: 0.35; }
+        .freq-cal-cell.trained {
+            background: linear-gradient(160deg, var(--accent), var(--primary));
+            color: #05050a;
+            font-weight: 700;
+        }
+        .freq-cal-cell.today { box-shadow: inset 0 0 0 1.5px var(--primary); }
+        .freq-cal-cell.today.trained { box-shadow: inset 0 0 0 1.5px #fff; }
+        .freq-cal-foot {
+            margin-top: 8px;
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
 
         /* Load record cards (recordes de carga) */
         .record-card {
@@ -6625,25 +6666,78 @@ function computeAttendanceStats(aluno) {
         else break;
     }
 
-    return { totalDays, last7, last30, avgPerWeek, weekdayCount, topDays, weekdayNames, lastDate: lastKey ? daysMap.get(lastKey) : null, heatmapWeeks, weekStreak, todayDow };
+    return { totalDays, last7, last30, avgPerWeek, weekdayCount, topDays, weekdayNames, lastDate: lastKey ? daysMap.get(lastKey) : null, heatmapWeeks, weekStreak, todayDow, daysMap };
 }
 
-function renderFrequencyHeatmap(stats) {
-    const dayLabels = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
-    const cols = stats.heatmapWeeks.map(week => {
-        const cells = week.map(c => {
-            const cls = c.isFuture ? 'freq-hm-cell future' : c.trained ? 'freq-hm-cell on' : 'freq-hm-cell off';
-            const todayCls = c.isToday ? ' today' : '';
-            const d = new Date(c.date + 'T00:00:00');
-            const title = `${d.toLocaleDateString('pt-BR')}${c.trained ? ' · treinou' : ''}`;
-            return `<div class="${cls}${todayCls}" title="${escapeAttr(title)}"></div>`;
-        }).join('');
-        return `<div class="freq-hm-col">${cells}</div>`;
+const FREQ_MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+// Navega o calendário de frequência para outro mês. Reflete tanto na visão
+// do professor (aba App Aluno) quanto na visão do próprio aluno.
+function changeFrequencyCalendarMonth(delta) {
+    if(!STATE.studentApp.freqCalendar) {
+        const now = new Date();
+        STATE.studentApp.freqCalendar = { year: now.getFullYear(), month: now.getMonth() };
+    }
+    let { year, month } = STATE.studentApp.freqCalendar;
+    month += delta;
+    if(month < 0) { month = 11; year--; }
+    if(month > 11) { month = 0; year++; }
+    const today = new Date();
+    if(year > today.getFullYear() || (year === today.getFullYear() && month > today.getMonth())) return;
+    STATE.studentApp.freqCalendar = { year, month };
+    renderProfessorAppPanel();
+    renderStudentDashboard();
+}
+
+// Calendário mensal completo (não só as últimas semanas): mostra o mês
+// selecionado com todos os dias treinados marcados, e permite navegar entre
+// meses - inclusive meses anteriores, com o histórico completo do aluno.
+function renderFrequencyCalendar(daysMap) {
+    if(!STATE.studentApp.freqCalendar) {
+        const now = new Date();
+        STATE.studentApp.freqCalendar = { year: now.getFullYear(), month: now.getMonth() };
+    }
+    const { year, month } = STATE.studentApp.freqCalendar;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayKey = today.toISOString().slice(0, 10);
+    const isCurrentMonth = year === today.getFullYear() && month === today.getMonth();
+
+    const firstOfMonth = new Date(year, month, 1);
+    const startDow = firstOfMonth.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const weekdayLabels = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+
+    const cells = [];
+    for(let i = 0; i < startDow; i++) cells.push(null);
+    for(let d = 1; d <= daysInMonth; d++) {
+        const dateObj = new Date(year, month, d);
+        const key = dateObj.toISOString().slice(0, 10);
+        cells.push({ day: d, key, trained: daysMap.has(key), isToday: key === todayKey, isFuture: dateObj > today });
+    }
+    while(cells.length % 7 !== 0) cells.push(null);
+
+    const monthTrainedCount = cells.filter(c => c && c.trained).length;
+    const headCells = weekdayLabels.map(l => `<div class="freq-cal-headcell">${l}</div>`).join('');
+    const dayCells = cells.map(c => {
+        if(!c) return '<div class="freq-cal-cell empty"></div>';
+        const cls = ['freq-cal-cell'];
+        if(c.trained) cls.push('trained');
+        if(c.isToday) cls.push('today');
+        if(c.isFuture) cls.push('future');
+        const title = c.trained ? `${c.day}/${month + 1} · treinou` : `${c.day}/${month + 1}`;
+        return `<div class="${cls.join(' ')}" title="${escapeAttr(title)}">${c.day}</div>`;
     }).join('');
-    const rowLabels = dayLabels.map(l => `<div class="freq-hm-rowlabel">${l}</div>`).join('');
-    return `<div class="freq-heatmap-wrap">
-        <div class="freq-hm-rowlabels">${rowLabels}</div>
-        <div class="freq-heatmap">${cols}</div>
+
+    return `<div class="freq-calendar">
+        <div class="freq-cal-nav">
+            <button onclick="changeFrequencyCalendarMonth(-1)" title="Mês anterior"><i class="fas fa-chevron-left"></i></button>
+            <strong>${FREQ_MONTH_NAMES[month]} ${year}</strong>
+            <button onclick="changeFrequencyCalendarMonth(1)" title="Mês seguinte" ${isCurrentMonth ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <div class="freq-cal-grid freq-cal-head">${headCells}</div>
+        <div class="freq-cal-grid">${dayCells}</div>
+        <div class="freq-cal-foot">${monthTrainedCount} dia(s) treinado(s) em ${FREQ_MONTH_NAMES[month].toLowerCase()}</div>
     </div>`;
 }
 
@@ -6676,8 +6770,8 @@ function renderFrequencyPanel(aluno) {
         <div class="freq-summary-strip">${statCards}</div>
         <div class="load-section-title" style="margin-bottom:6px;"><i class="fas fa-chart-simple"></i> Distribuição por dia da semana</div>
         <div class="freq-bars">${bars}</div>
-        <div class="load-section-title" style="margin-top:16px; margin-bottom:6px;"><i class="fas fa-border-all"></i> Consistência (últimas ${stats.heatmapWeeks.length} semanas)</div>
-        ${renderFrequencyHeatmap(stats)}
+        <div class="load-section-title" style="margin-top:16px; margin-bottom:6px;"><i class="fas fa-calendar-days"></i> Calendário de Treinos</div>
+        ${renderFrequencyCalendar(stats.daysMap)}
         <div class="student-mini-text" style="margin-top:10px;"><i class="fas fa-calendar-day"></i> Dias mais frequentes: <strong style="color:var(--text-main);">${topDaysText || '—'}</strong> · Último treino: ${lastText} · 30 dias: <strong style="color:var(--text-main);">${stats.last30}</strong></div>
     `;
 }
