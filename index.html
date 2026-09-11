@@ -1752,6 +1752,32 @@
             gap: 6px;
         }
         .feedback-reply-form textarea { margin-bottom: 0; }
+        .feedback-reply-form input[type="file"] { font-size: 0.7rem; color: var(--text-dim); }
+        .va-video-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
+            color: var(--accent);
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .va-video-link:hover { text-decoration: underline; }
+        .va-pending-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(255,179,0,0.12);
+            color: var(--warning);
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
 
         /* Load progression cards */
         .load-section-title {
@@ -2598,6 +2624,13 @@
         <input type="text" id="feedback-search" placeholder="Buscar aluno..." oninput="renderFeedbackFeed()" style="margin-bottom:14px;">
         <div id="feedback-feed"></div>
     </div>
+    <div class="card trainer-only">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+            <h2 class="section-title" style="margin:0; border:none; padding:0;"><i class="fas fa-video"></i> Análises de Vídeo</h2>
+        </div>
+        <input type="text" id="video-analysis-search" placeholder="Buscar aluno ou exercício..." oninput="renderVideoAnalysisFeed()" style="margin-bottom:14px;">
+        <div id="video-analysis-feed"></div>
+    </div>
 </div>
 
 <!-- ===================== TAB: CONFIG ===================== -->
@@ -3192,6 +3225,7 @@ const STATE = {
     studentPlans: {},
     studentSessions: [],
     studentPhotos: {}, // { code: [ {id, url(base64), date, note}, ... ] }
+    videoAnalyses: {}, // { code: [ {id, exercise, videoUrl, note, date, reply:{text,pdfName,pdfData,date}}, ... ] }
     studentApp: { activeCode: '', workoutId: 'A', sessionId: '', view: 'treino' }
 };
 
@@ -3444,6 +3478,7 @@ function loadDataFromDB() {
     getFromDB('studentPlans', v => { if(v && typeof v === 'object') STATE.studentPlans = v; renderStudentAppLight(); });
     getFromDB('studentSessions', v => { if(Array.isArray(v)) STATE.studentSessions = v; renderStudentAppLight(); });
     getFromDB('studentPhotos', v => { if(v && typeof v === 'object') STATE.studentPhotos = v; });
+    getFromDB('videoAnalyses', v => { if(v && typeof v === 'object') STATE.videoAnalyses = v; });
     populateGrupoSelect();
     populatePrioridadeSelect();
     renderStudentAppLight();
@@ -3658,6 +3693,74 @@ function compressImageFile(file, maxDim = 1000, quality = 0.72) {
     });
 }
 
+// Lê qualquer arquivo (ex: PDF) como base64, sem compressão - usado pro anexo
+// de documento na análise de vídeo. Diferente de compressImageFile, não
+// redimensiona nada (não daria pra "comprimir" um PDF assim).
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+    });
+}
+
+/* ================================================================
+   ANÁLISE DE VÍDEO — nt_plans/{code}/videoAnalyses/{id}
+   Aluno manda um link de vídeo do exercício; professor responde com texto
+   e, opcionalmente, um PDF anexo com a análise.
+   ================================================================ */
+async function cloudSaveVideoAnalysis(code, item) {
+    if(!isCloudConfigured() || !code || !item?.id) return;
+    const dbRef = await initCloudSync();
+    if(!dbRef) return;
+    try {
+        await dbRef.collection('nt_plans').doc(code).collection('videoAnalyses').doc(item.id).set(item);
+    } catch(e) { console.error('[NT] cloudSaveVideoAnalysis error:', e); }
+}
+
+async function cloudFetchVideoAnalyses(code) {
+    if(!isCloudConfigured() || !code) return [];
+    const dbRef = await initCloudSync();
+    if(!dbRef) return [];
+    try {
+        const snap = await dbRef.collection('nt_plans').doc(code).collection('videoAnalyses').get();
+        return snap.docs.map(d => d.data());
+    } catch(e) { console.error('[NT] cloudFetchVideoAnalyses error:', e); return []; }
+}
+
+async function cloudListenVideoAnalyses(code, onChange) {
+    if(!isCloudConfigured() || !code) return () => {};
+    const dbRef = await initCloudSync();
+    if(!dbRef) return () => {};
+    try {
+        return dbRef.collection('nt_plans').doc(code).collection('videoAnalyses')
+            .onSnapshot(
+                snap => onChange(snap.docs.map(d => d.data())),
+                e => console.error('[NT] cloudListenVideoAnalyses error:', e)
+            );
+    } catch(e) {
+        console.error('[NT] cloudListenVideoAnalyses setup error:', e);
+        return () => {};
+    }
+}
+
+function mergeCloudVideoAnalyses(code, cloudItems) {
+    if(!code || !Array.isArray(cloudItems)) return false;
+    const sorted = cloudItems.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const changed = JSON.stringify(STATE.videoAnalyses[code] || []) !== JSON.stringify(sorted);
+    if(changed) { STATE.videoAnalyses[code] = sorted; saveToDB('videoAnalyses', STATE.videoAnalyses); }
+    return changed;
+}
+
+function isValidHttpUrl(value) {
+    try {
+        const u = new URL(String(value || '').trim());
+        return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch(e) { return false; }
+}
+
+
 
 function showToast(msg, type='info', duration=3000) {
     const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', info: 'fa-info-circle' };
@@ -3727,7 +3830,7 @@ function showTab(tabId, btn) {
     if(tabId === 'tab-media') { populateMediaGrupoSelect(); renderMediaLibrary(); }
     if(tabId === 'tab-app') { renderStudentAppAll(); }
     if(tabId === 'tab-evolucao') { renderEvolutionGallery(); }
-    if(tabId === 'tab-feedback') { renderFeedbackFeed(); }
+    if(tabId === 'tab-feedback') { renderFeedbackFeed(); renderVideoAnalysisFeed(); }
 }
 
 // Abrir análise a partir da ficha — salva contexto completo
@@ -5482,7 +5585,8 @@ function exportData() {
             mediaLib: STATE.mediaLib,
             studentPlans: STATE.studentPlans,
             studentSessions: STATE.studentSessions,
-            studentPhotos: STATE.studentPhotos
+            studentPhotos: STATE.studentPhotos,
+            videoAnalyses: STATE.videoAnalyses
         };
         const a = document.createElement('a');
         const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
@@ -5519,6 +5623,7 @@ function importData() {
             if(data.studentPlans && typeof data.studentPlans === 'object') STATE.studentPlans = data.studentPlans;
             if(Array.isArray(data.studentSessions)) STATE.studentSessions = data.studentSessions;
             if(data.studentPhotos && typeof data.studentPhotos === 'object') STATE.studentPhotos = data.studentPhotos;
+            if(data.videoAnalyses && typeof data.videoAnalyses === 'object') STATE.videoAnalyses = data.videoAnalyses;
             saveToDB('alunos', STATE.alunos);
             saveToDB('treinos', STATE.treinosA_G);
             saveToDB('historico', STATE.historico);
@@ -5527,6 +5632,7 @@ function importData() {
             saveToDB('studentPlans', STATE.studentPlans);
             saveToDB('studentSessions', STATE.studentSessions);
             saveToDB('studentPhotos', STATE.studentPhotos);
+            saveToDB('videoAnalyses', STATE.videoAnalyses);
             showToast('Dados importados com sucesso!', 'success');
             setTimeout(() => location.reload(), 1500);
         } catch(err) {
@@ -6068,6 +6174,7 @@ async function enterStudentApp(code = '') {
     showToast(`Bem-vindo, ${plan.aluno}.`, 'success');
     startStudentSessionSync(plan.code);
     startStudentPhotoSync(plan.code);
+    startVideoAnalysisSync(plan.code);
 }
 
 function startStudentSessionSync(code) {
@@ -6085,6 +6192,15 @@ function startStudentPhotoSync(code) {
     cloudListenPhotos(code, photos => {
         if(mergeCloudPhotos(code, photos)) renderStudentDashboard();
     }).then(unsub => { studentPhotoUnsub = unsub; });
+}
+
+let videoAnalysisUnsub = null;
+function startVideoAnalysisSync(code) {
+    if(!isCloudConfigured()) return;
+    if(videoAnalysisUnsub) { videoAnalysisUnsub(); videoAnalysisUnsub = null; }
+    cloudListenVideoAnalyses(code, items => {
+        if(mergeCloudVideoAnalyses(code, items)) renderStudentDashboard();
+    }).then(unsub => { videoAnalysisUnsub = unsub; });
 }
 
 async function addStudentEvolutionPhoto(input) {
@@ -6971,7 +7087,71 @@ function renderStudentFeedbackView(plan, currentSession) {
         </div>
         <div class="load-section-title" style="margin-top:16px; margin-bottom:6px;"><i class="fas fa-clock-rotate-left"></i> Seus feedbacks anteriores</div>
         ${historyHtml}
+        <div class="load-section-title" style="margin-top:22px; margin-bottom:6px;"><i class="fas fa-video"></i> Análise de Vídeo</div>
+        ${renderVideoAnalysisSection(plan)}
     `;
+}
+
+function renderVideoAnalysisSection(plan) {
+    const items = (STATE.videoAnalyses[plan.code] || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const listHtml = items.length
+        ? `<div class="feedback-history-list">${items.map(v => {
+            const date = new Date(v.date).toLocaleDateString('pt-BR');
+            const reply = v.reply?.text
+                ? `<div class="feedback-reply-shown">
+                    <span class="feedback-reply-label"><i class="fas fa-reply"></i> Análise do professor</span>
+                    <p>${escapeHtml(v.reply.text)}</p>
+                    ${v.reply.pdfData ? `<a href="${v.reply.pdfData}" download="${escapeAttr(v.reply.pdfName || 'analise.pdf')}" class="btn btn-ghost btn-small" style="margin-top:6px;"><i class="fas fa-file-pdf"></i> ${escapeHtml(v.reply.pdfName || 'Baixar PDF')}</a>` : ''}
+                   </div>`
+                : '<div class="va-pending-tag"><i class="fas fa-hourglass-half"></i> Aguardando análise do professor</div>';
+            return `<div class="feedback-item">
+                <div class="feedback-item-head">
+                    <strong>${escapeHtml(v.exercise)}</strong>
+                    <span>${date}</span>
+                </div>
+                <a href="${escapeAttr(v.videoUrl)}" target="_blank" rel="noopener" class="va-video-link"><i class="fas fa-video"></i> Ver vídeo enviado</a>
+                ${v.note ? `<p>${escapeHtml(v.note)}</p>` : ''}
+                ${reply}
+            </div>`;
+        }).join('')}</div>`
+        : '<div class="empty-state" style="padding:18px;"><i class="fas fa-video"></i><p>Nenhum vídeo enviado ainda.</p><span class="empty-state-hint">Manda o link de um vídeo seu fazendo o exercício pra receber correções.</span></div>';
+
+    return `
+        <div class="student-feedback-panel">
+            <label>Qual exercício</label>
+            <input type="text" id="va-exercise" placeholder="Ex: Supino reto">
+            <label>Link do vídeo</label>
+            <input type="url" id="va-video-url" placeholder="Cole o link (Google Drive, YouTube não listado...)">
+            <label>Alguma observação? (opcional)</label>
+            <textarea id="va-note" rows="2" placeholder="Ex: sinto que tô perdendo a postura no final da série"></textarea>
+            <button class="btn" onclick="submitVideoAnalysis()"><i class="fas fa-paper-plane"></i> Enviar vídeo</button>
+        </div>
+        <div class="load-section-title" style="margin-top:16px; margin-bottom:6px;"><i class="fas fa-clock-rotate-left"></i> Seus vídeos enviados</div>
+        ${listHtml}
+    `;
+}
+
+function submitVideoAnalysis() {
+    const plan = findStudentPlanByCode(STATE.studentApp.activeCode);
+    if(!plan) return;
+    const exercise = document.getElementById('va-exercise')?.value.trim() || '';
+    const videoUrl = document.getElementById('va-video-url')?.value.trim() || '';
+    const note = document.getElementById('va-note')?.value.trim() || '';
+    if(!exercise) { showToast('Diz qual exercício é o vídeo.', 'error'); return; }
+    if(!isValidHttpUrl(videoUrl)) { showToast('Cole um link de vídeo válido (começando com http:// ou https://).', 'error'); return; }
+    const item = {
+        id: `va-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        exercise,
+        videoUrl,
+        note,
+        date: new Date().toISOString()
+    };
+    const list = STATE.videoAnalyses[plan.code] || (STATE.videoAnalyses[plan.code] = []);
+    list.push(item);
+    saveToDB('videoAnalyses', STATE.videoAnalyses);
+    cloudSaveVideoAnalysis(plan.code, item);
+    renderStudentDashboard();
+    showToast('Vídeo enviado para análise!', 'success');
 }
 
 function saveStudentFeedback() {
@@ -7272,6 +7452,118 @@ function saveFeedbackReply(sessionId) {
 }
 
 /* ================================================================
+   ANÁLISES DE VÍDEO (todos os alunos juntos) — visão do professor
+   ================================================================ */
+async function renderVideoAnalysisFeed() {
+    const container = document.getElementById('video-analysis-feed');
+    if(!container) return;
+    container.innerHTML = '<div class="empty-state" style="padding:30px;"><i class="fas fa-spinner fa-spin"></i><p>Carregando vídeos...</p></div>';
+
+    const withPlans = STATE.alunos
+        .map(a => a.nome || a)
+        .map(nome => getStudentPlanByName(nome))
+        .filter(Boolean);
+
+    if(isCloudConfigured()) {
+        await Promise.all(withPlans.map(async plan => {
+            const items = await cloudFetchVideoAnalyses(plan.code);
+            mergeCloudVideoAnalyses(plan.code, items);
+        }));
+    }
+
+    renderVideoAnalysisFeedList();
+}
+
+function renderVideoAnalysisFeedList() {
+    const container = document.getElementById('video-analysis-feed');
+    if(!container) return;
+    const q = (document.getElementById('video-analysis-search')?.value || '').toLowerCase();
+
+    const entries = [];
+    Object.entries(STATE.videoAnalyses).forEach(([code, items]) => {
+        const plan = Object.values(STATE.studentPlans).find(p => p.code === code);
+        const alunoName = plan?.aluno || '';
+        (items || []).forEach(v => entries.push({ ...v, code, aluno: alunoName }));
+    });
+
+    const filtered = entries
+        .filter(v => v.aluno.toLowerCase().includes(q) || v.exercise.toLowerCase().includes(q))
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+    if(!filtered.length) {
+        container.innerHTML = entries.length
+            ? '<div class="empty-state" style="padding:30px;"><i class="fas fa-video"></i><p>Nenhum vídeo encontrado para essa busca.</p></div>'
+            : '<div class="empty-state" style="padding:30px;"><i class="fas fa-video"></i><p>Nenhum vídeo enviado ainda.</p><span class="empty-state-hint">Assim que um aluno enviar um vídeo pra análise, ele aparece aqui.</span></div>';
+        return;
+    }
+
+    container.innerHTML = `<div class="feedback-history-list">${filtered.map(v => {
+        const date = new Date(v.date).toLocaleDateString('pt-BR');
+        const hasReply = !!v.reply?.text;
+        return `<div class="feedback-item${!hasReply ? ' is-recent' : ''}">
+            <div class="feedback-item-head">
+                <strong>${escapeHtml(v.aluno)} <span style="color:var(--text-dim); font-weight:600;">· ${escapeHtml(v.exercise)}</span></strong>
+                <span>${date}</span>
+            </div>
+            <a href="${escapeAttr(v.videoUrl)}" target="_blank" rel="noopener" class="va-video-link"><i class="fas fa-video"></i> Abrir vídeo</a>
+            ${v.note ? `<p>${escapeHtml(v.note)}</p>` : ''}
+            <div class="feedback-reply-box">
+                ${hasReply ? `<div class="feedback-reply-shown">
+                    <span class="feedback-reply-label"><i class="fas fa-reply"></i> Sua análise</span>
+                    <p>${escapeHtml(v.reply.text)}</p>
+                    ${v.reply.pdfData ? `<a href="${v.reply.pdfData}" download="${escapeAttr(v.reply.pdfName || 'analise.pdf')}" class="btn btn-ghost btn-small" style="margin-top:6px;"><i class="fas fa-file-pdf"></i> ${escapeHtml(v.reply.pdfName || 'PDF anexado')}</a>` : ''}
+                    <button class="btn btn-ghost btn-small" style="margin-top:6px;" onclick="toggleVideoReplyEdit('${v.id}')"><i class="fas fa-pen"></i> Editar</button>
+                </div>` : ''}
+                <div class="feedback-reply-form" id="va-reply-form-${v.id}" style="${hasReply ? 'display:none;' : ''}">
+                    <textarea id="va-reply-text-${v.id}" rows="2" placeholder="Escreva sua análise/correção...">${escapeHtml(v.reply?.text || '')}</textarea>
+                    <input type="file" id="va-reply-pdf-${v.id}" accept="application/pdf">
+                    ${v.reply?.pdfName ? `<span class="student-mini-text">PDF atual: ${escapeHtml(v.reply.pdfName)} (selecione outro pra substituir)</span>` : ''}
+                    <button class="btn btn-small" onclick="saveVideoAnalysisReply('${v.code}','${v.id}')"><i class="fas fa-paper-plane"></i> Enviar análise</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('')}</div>`;
+}
+
+function toggleVideoReplyEdit(itemId) {
+    const form = document.getElementById(`va-reply-form-${itemId}`);
+    if(form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveVideoAnalysisReply(code, itemId) {
+    const list = STATE.videoAnalyses[code] || [];
+    const item = list.find(v => v.id === itemId);
+    if(!item) return;
+    const textInput = document.getElementById(`va-reply-text-${itemId}`);
+    const fileInput = document.getElementById(`va-reply-pdf-${itemId}`);
+    const text = textInput?.value.trim() || '';
+    if(!text) { showToast('Escreva a análise antes de enviar.', 'error'); return; }
+
+    let pdfData = item.reply?.pdfData || null;
+    let pdfName = item.reply?.pdfName || null;
+    const file = fileInput?.files?.[0];
+    if(file) {
+        if(file.type !== 'application/pdf') { showToast('Anexe um arquivo PDF.', 'error'); return; }
+        try {
+            const dataUrl = await readFileAsDataUrl(file);
+            if(dataUrl.length > 900000) { showToast('PDF muito grande (máx. ~650KB). Tente um arquivo menor.', 'error'); return; }
+            pdfData = dataUrl;
+            pdfName = file.name;
+        } catch(e) {
+            console.error('[NT] saveVideoAnalysisReply PDF error:', e);
+            showToast('Não foi possível ler o PDF.', 'error');
+            return;
+        }
+    }
+
+    item.reply = { text, pdfData, pdfName, date: new Date().toISOString() };
+    saveToDB('videoAnalyses', STATE.videoAnalyses);
+    cloudSaveVideoAnalysis(code, item);
+    showToast('Análise enviada ao aluno!', 'success');
+    renderVideoAnalysisFeedList();
+}
+
+/* ================================================================
    GALERIA DE EVOLUÇÃO (todos os alunos juntos) — visão do professor
    ================================================================ */
 async function renderEvolutionGallery() {
@@ -7503,6 +7795,7 @@ function importStudentPlanFromUrl() {
                     }
                     startStudentSessionSync(activeCode);
                     startStudentPhotoSync(activeCode);
+                    startVideoAnalysisSync(activeCode);
                 }
                 renderStudentDashboard();
             }, 150);
